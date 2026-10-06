@@ -1,0 +1,37 @@
+/opt/miniconda3/envs/petals-mo809/lib/python3.11/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/opt/miniconda3/envs/petals-mo809/lib/python3.11/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Sep 20 18:30:33.025 [INFO] Running Petals 2.3.0.dev2
+Sep 20 18:30:33.771 [INFO] Make sure you follow the BLOOM terms of use: https://bit.ly/bloom-license
+Sep 20 18:30:33.772 [INFO] Using DHT prefix: bigscience/bloom-560m-petals
+Sep 20 18:30:34.248 [INFO] This server is accessible directly
+Sep 20 18:30:34.494 [INFO] Connecting to a private swarm, initial peers: ['/ip4/192.168.2.109/tcp/31337/p2p/12D3KooWE8Fttrf6BF4RW42eKv8r8avzCxv5CbTFxtWbvReWji9Z']
+Sep 20 18:30:34.495 [INFO] Running a server on ['/ip4/192.168.2.163/tcp/31338/p2p/12D3KooWBYCbCQUijAPzjhwp7E9oh6oSofAjys2ZQV5ououCUbZz']
+Sep 20 18:30:34.495 [INFO] Model weights are loaded in float32 format
+Sep 20 18:30:34.496 [INFO] Attention cache for all blocks will consume up to 0.38 GiB
+Sep 20 18:30:34.496 [INFO] Loading throughput info
+Sep 20 18:30:34.497 [INFO] Reporting throughput: 3670.5 tokens/sec for 12 blocks
+Sep 20 18:30:34.512 [INFO] Announced that blocks range(12, 24) are joining
+Sep 20 18:32:14.418 [INFO] Loaded bigscience/bloom-560m block 12
+'NoneType' object has no attribute 'cadam32bit_grad_fp32'
+Sep 20 18:32:18.510 [INFO] Loaded bigscience/bloom-560m block 13
+Sep 20 18:32:18.544 [INFO] Loaded bigscience/bloom-560m block 14
+Sep 20 18:32:18.580 [INFO] Loaded bigscience/bloom-560m block 15
+Sep 20 18:32:18.598 [INFO] Loaded bigscience/bloom-560m block 16
+Sep 20 18:32:18.642 [INFO] Loaded bigscience/bloom-560m block 17
+Sep 20 18:32:18.686 [INFO] Loaded bigscience/bloom-560m block 18
+Sep 20 18:32:18.804 [INFO] Loaded bigscience/bloom-560m block 19
+Sep 20 18:32:18.843 [INFO] Loaded bigscience/bloom-560m block 20
+Sep 20 18:32:18.883 [INFO] Loaded bigscience/bloom-560m block 21
+Sep 20 18:32:18.925 [INFO] Loaded bigscience/bloom-560m block 22
+Sep 20 18:32:18.997 [INFO] Loaded bigscience/bloom-560m block 23
+Sep 20 18:32:19.174 [INFO] Started
+Sep 20 18:33:04.193 [INFO] rpc_inference.open(blocks=12:24, remote_peer=...YGgPgf)
+Sep 20 18:33:04.197 [INFO] rpc_inference.wait_for_alloc(size=0.00 GiB), already used 0.00/0.38 GiB (0.0%)
+Sep 20 18:33:04.201 [INFO] rpc_inference.alloc_done(size=0.00 GiB)
+Sep 20 18:33:04.536 [INFO] rpc_inference.close(blocks=12:24, remote_peer=...YGgPgf)
+Sep 20 18:33:04.616 [INFO] rpc_inference.open(blocks=12:24, remote_peer=...YGgPgf)
+Sep 20 18:33:04.617 [INFO] rpc_inference.wait_for_alloc(size=0.00 GiB), already used 0.00/0.38 GiB (0.0%)
+Sep 20 18:33:04.619 [INFO] rpc_inference.alloc_done(size=0.00 GiB)
+Sep 20 18:33:05.896 [INFO] rpc_inference.close(blocks=12:24, remote_peer=...YGgPgf)

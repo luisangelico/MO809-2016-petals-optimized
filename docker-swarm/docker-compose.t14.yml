@@ -1,0 +1,35 @@
+# Run on T14. Best-effort node — corporate VPN/firewall may block inbound libp2p TCP;
+# if so, drop this host and keep the 5-node T490+Mac swarm (see docker-swarm/README.md).
+services:
+  t14-medium:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 2
+    mem_limit: 2g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 4 --device cpu --torch_dtype float32
+      --identity_path /cache/medium.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31342
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31342
+    ports: ["31342:31342/tcp"]
+    volumes: ["t14-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  t14-slow:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 1
+    mem_limit: 1g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 1 --device cpu --torch_dtype float32
+      --identity_path /cache/slow.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31343
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31343
+    ports: ["31343:31343/tcp"]
+    volumes: ["t14-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+volumes:
+  t14-cache:

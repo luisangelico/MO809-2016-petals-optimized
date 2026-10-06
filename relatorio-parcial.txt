@@ -1,0 +1,308 @@
+REPRODUCAO DE INFERENCIA DISTRIBUIDA DE LLMs EM REDE DOMESTICA:
+UM ESTUDO BASEADO NO PETALS
+
+Disciplina: MO809A
+Autor: Luis Henrique Angelico
+Documento: Relatorio parcial de andamento
+Data: 20 de setembro de 2026
+
+Observacao: este e um relatorio parcial, elaborado para acompanhamento do
+andamento do projeto. A versao final seguira obrigatoriamente o Template de
+Conferencia da SBC. A estrutura de secoes abaixo ja antecipa a organizacao
+exigida (Introducao, Background, Trabalhos Relacionados, Proposta,
+Metodologia, Resultados, Conclusao e Referencias); as secoes de Resultados e
+Conclusao estao parciais, refletindo o estagio atual de desenvolvimento.
+
+====================================================================
+
+1. INTRODUCAO
+
+Modelos de linguagem de grande porte (LLMs) com dezenas a centenas de bilhoes
+de parametros nao cabem na memoria de maquinas comuns e, tradicionalmente,
+exigem GPUs de alto custo ou servicos de nuvem para inferencia. Uma
+alternativa e particionar o modelo em blocos (camadas do transformer)
+distribuidos entre multiplas maquinas, de modo que cada participante hospede
+apenas uma fracao do modelo e as ativacoes trafeguem por uma cadeia de
+servidores - abordagem popularizada pelo sistema Petals, construido sobre a
+biblioteca Hivemind.
+
+Este projeto tem como objetivo reproduzir, em ambiente domestico e com
+recursos heterogeneos, o mecanismo de inferencia distribuida do Petals, e
+avaliar experimentalmente suas propriedades de sistemas distribuidos: latencia
+e vazao, sobrecarga de comunicacao, sensibilidade a rede e tolerancia a
+falhas. O foco nao e reproduzir a escala do Petals (centenas de voluntarios e
+modelos de 100B+), inviavel com duas ou tres maquinas, mas sim reproduzir e
+medir o mecanismo com modelos pequenos, em uma rede local (LAN).
+
+--------------------------------------------------------------------
+
+2. BACKGROUND
+
+- Particionamento de modelo (pipeline/model parallelism): um transformer e
+  dividido em blocos sequenciais; cada no hospeda um subconjunto de blocos e
+  executa o forward apenas de sua parte.
+
+- DHT (Distributed Hash Table): tabela hash distribuida no estilo Kademlia
+  usada pelo Hivemind para descoberta descentralizada de pares (quais nos
+  hospedam quais blocos), sem um no mestre.
+
+- libp2p: camada de rede peer-to-peer (via o daemon Go p2pd) que prove RPC
+  entre pares, multiplexacao de fluxos e travessia de NAT.
+
+- Cliente e roteamento: no Petals, o cliente descobre pela DHT quais pares
+  hospedam cada bloco, monta uma rota e relaya as ativacoes de um servidor ao
+  proximo, implementando o autograd distribuido.
+
+- Quantizacao: o Petals usa bitsandbytes para compressao de pesos em
+  8-bit/NF4 - funcionalidade dependente de CUDA, portanto indisponivel nas
+  maquinas deste projeto (sem GPU NVIDIA).
+
+--------------------------------------------------------------------
+
+3. TRABALHOS RELACIONADOS
+
+- Petals (Borzunov et al., ACL 2023): plataforma colaborativa de inferencia e
+  fine-tuning de LLMs de 100B+ pela Internet, no estilo BitTorrent. E a base
+  direta desta reproducao. Limitacao relevante: o projeto encontra-se
+  praticamente sem manutencao - as dependencias estao congeladas (ex.:
+  transformers==4.43.1) e o conjunto de arquiteturas suportadas e fixo (Llama,
+  BLOOM, Falcon, Mixtral).
+
+- Distributed Inference and Fine-tuning of LLMs over the Internet (Borzunov et
+  al., NeurIPS 2023): fundamentacao teorica do roteamento tolerante a falhas e
+  do balanceamento de carga do Petals.
+
+- Hivemind (Ryabinin et al.): biblioteca de aprendizado profundo
+  descentralizado (DHT, all-reduce descentralizado, MoE) sobre a qual o Petals
+  e construido. Diferentemente do Petals, continua ativamente mantida.
+
+- SWARM Parallelism (Ryabinin et al., ICML 2023): treinamento de grandes
+  modelos com comunicacao eficiente sobre dispositivos heterogeneos e nao
+  confiaveis.
+
+Contraste da proposta: solucoes alternativas para rodar LLMs sem hardware de
+ponta incluem inferencia local com offloading para disco/CPU (ex.:
+DeepSpeed-ZeRO-Inference, accelerate) e servicos centralizados de API. A
+abordagem do Petals difere por agrupar maquinas independentes e nao confiaveis
+em um swarm, sem no mestre.
+
+--------------------------------------------------------------------
+
+4. PROPOSTA
+
+Montar um swarm privado de 2-3 nos em rede domestica que reproduz a inferencia
+particionada por blocos do Petals com um modelo pequeno, e avalia-lo como um
+sistema distribuido. O diferencial em relacao a simplesmente "usar o Petals" e
+o carater experimental e comparativo: mede-se o custo de comunicacao, o efeito
+da heterogeneidade dos nos, a sensibilidade a condicoes de rede (latencia/perda
+simuladas) e a tolerancia a falhas.
+
+Experimento central (hipotese-guia): um modelo que nao cabe na memoria de um
+unico no (ex.: Llama-2-7B em float32 ~= 27 GB, acima dos 24 GB do notebook
+T490) falha ao ser executado isoladamente, mas completa a inferencia quando
+seus blocos sao distribuidos entre os nos - evidenciando, em escala domestica,
+a proposta de valor do Petals.
+
+--------------------------------------------------------------------
+
+5. METODOLOGIA
+
+5.1 Infraestrutura (heterogenea por natureza)
+
+  No 1 - MacBook (M4 Pro)
+    Arquitetura: Apple Silicon (arm64)
+    S.O.: macOS 26.7
+    Recursos: GPU via MPS; atras de proxy corporativo
+    Papel: Servidor + cliente
+
+  No 2 - Lenovo T490
+    Arquitetura: x86_64
+    S.O.: Ubuntu 24.04.5 LTS
+    Recursos: 24 GB RAM, sem GPU
+    Papel: Servidor + fundador do swarm
+
+  No 3 - Lenovo T14 (corporativo)
+    Arquitetura: x86_64
+    Recursos: sem GPU
+    Papel: No opcional (bonus)
+
+A heterogeneidade (arquiteturas, dispositivos e velocidades distintas) e
+tratada como objeto de estudo, nao como limitacao: permite analisar efeito de
+stragglers e politicas de alocacao de blocos.
+
+5.2 Ambiente de software (identico em todos os nos)
+
+Ambiente reproduzivel via Conda (Python 3.11), com a stack congelada do
+Petals:
+
+  - torch 2.14.0 (CPU no T490; MPS disponivel no Mac)
+  - transformers 4.43.1 (versao fixada e verificada em tempo de importacao)
+  - hivemind 1.2.0.dev0 (commit fixo 213bff98..., exigido pelo Petals)
+  - petals 2.3.0.dev2
+
+Desafios de instalacao superados (documentados para reprodutibilidade):
+
+  1. Proxy corporativo (MITM) no Mac: conda/pip/git rejeitavam o certificado;
+     solucionado apontando as ferramentas para o bundle de CAs corporativo
+     (REQUESTS_CA_BUNDLE, SSL_CERT_FILE, GIT_SSL_CAINFO etc.). O T490 nao esta
+     atras do proxy.
+
+  2. Versao do Python: os interpretadores padrao (3.13 no Mac; 3.12/3.14 no
+     T490) sao novos demais para a stack fixada - criou-se ambiente dedicado em
+     Python 3.11.
+
+  3. Build do commit fixo do Hivemind: falhava sob setuptools >= 81 (remocao de
+     pkg_resources); solucionado fixando setuptools < 81 e instalando com
+     --no-build-isolation.
+
+  4. Torch enxuto no T490: instalou-se a variante CPU-only do PyTorch,
+     evitando o download de ~2 GB de bibliotecas CUDA inuteis em maquina sem
+     GPU.
+
+  5. CDN Xet do HuggingFace bloqueado pelo proxy: o backend novo de download
+     do HuggingFace (Xet, dominio us.aws.cdn.hf.co) retorna 403 atras do proxy
+     corporativo, interrompendo o download do tokenizer e dos pesos. Um
+     servidor afetado chega a anunciar os blocos como "joining" na DHT, mas
+     nunca fica efetivamente online. Solucionado desabilitando o Xet
+     (HF_HUB_DISABLE_XET=1), que forca a rota HTTPS classica (resolve/main),
+     esta sim compativel com o proxy e o bundle de CAs.
+
+5.3 Topologia do swarm
+
+Os dois nos atuam como peers completos, com conectividade TCP bidirecional na
+LAN (verificou-se experimentalmente que cada maquina consegue tanto discar
+quanto aceitar conexoes da outra). Cada servidor anuncia explicitamente seu
+endereco de LAN na DHT (via --announce_maddrs), evitando que sejam anunciados
+os IPs das bridges Docker/Tailscale, que o outro no nao roteia:
+
+  - T490: fundador do swarm (--new_swarm), servidor com os blocos 0:12,
+    anunciando /ip4/192.168.2.109/tcp/31337.
+
+  - Mac: servidor com os blocos 12:24 mais o cliente, conectando-se ao T490
+    como initial peer e anunciando /ip4/192.168.2.163/tcp/31338.
+
+O cliente descobre pela DHT quais nos hospedam quais blocos, monta a rota e
+relaya as ativacoes na ordem T490 (0:12) -> Mac (12:24). O modelo
+bigscience/bloom-560m (24 blocos) e dividido de modo que um forward completo
+obrigatoriamente atravesse os dois nos.
+
+Nota sobre seguranca corporativa: embora o Mac execute agentes de endpoint com
+extensoes de rede (Cisco Secure Client, Forcepoint), constatou-se que, a partir
+do terminal interativo, ele estabelece e aceita conexoes diretas na LAN
+normalmente, atuando como servidor e cliente do swarm sem contorno especial de
+firewall.
+
+5.4 Metricas planejadas
+
+  - Latencia e vazao: tokens/s em geracao single-batch e sob concorrencia;
+    tempo ate o primeiro token.
+
+  - Sobrecarga de comunicacao: bytes de ativacao transferidos por token;
+    parcela do tempo gasta em rede vs. computacao.
+
+  - Alocacao de blocos / stragglers: desempenho em funcao da distribuicao de
+    blocos entre no rapido (Mac) e lento (T490).
+
+  - Sensibilidade a rede (WAN simulada): injecao de latencia/perda com tc netem
+    (Linux) e Network Link Conditioner (macOS), medindo tokens/s vs. condicoes
+    de rede.
+
+  - Tolerancia a falhas: derrubar um servidor durante a geracao e medir se/
+    quando o cliente re-descobre blocos pela DHT e reroteia (tempo de
+    recuperacao).
+
+--------------------------------------------------------------------
+
+6. RESULTADOS (PARCIAIS)
+
+Ate o momento, foram concluidos os marcos de viabilidade, preparacao de
+ambiente e a primeira inferencia distribuida:
+
+  [CONCLUIDO] Instalacao e execucao da stack do Petals em Apple Silicon (Mac).
+  Todos os componentes importam corretamente; torch.backends.mps.is_available()
+  retorna verdadeiro (GPU do Mac utilizavel via MPS).
+
+  [CONCLUIDO] Teste de fumaca no Mac: um servidor hospedando 2 blocos do
+  bloom-560m em float32 inicializou, carregou os pesos e anunciou seus blocos a
+  DHT com sucesso (vazao reportada ~= 4.400 tokens/s para 2 blocos, valor
+  apenas indicativo em CPU).
+
+  [CONCLUIDO] Instalacao identica no T490 (Ubuntu, x86, sem GPU): mesma stack
+  (transformers 4.43.1, hivemind 1.2.0.dev0, petals 2.3.0.dev2), com PyTorch
+  CPU-only (torch 2.14.0+cpu, cuda=False).
+
+  [CONCLUIDO] Conectividade de rede validada: ambos os nos na mesma sub-rede
+  /24, com conectividade TCP bidirecional confirmada (cada maquina disca e
+  aceita conexoes da outra). Constatou-se que o Mac, apesar dos agentes de
+  seguranca corporativos, atua como peer completo (servidor e cliente) na LAN.
+
+  [CONCLUIDO] Swarm de dois nos no ar: T490 (fundador) hospedando os blocos
+  0:12 e o Mac hospedando os blocos 12:24, cada no anunciando seu endereco de
+  LAN na DHT. O cliente monta a rota atravessando os dois nos.
+
+  [CONCLUIDO] Primeira inferencia distribuida ponta a ponta: com o prompt
+  "The capital of France is", o forward percorreu os dois nos (0:12 no T490 ->
+  12:24 no Mac) e o modelo completou o texto de forma coerente ("...Paris, and
+  the capital of the United Kingdom is London..."). Metricas indicativas desta
+  primeira execucao (CPU, LAN, lote unico, com a rota ja aquecida): tempo ate o
+  primeiro token de aproximadamente 0,51 s; 20 tokens gerados em cerca de
+  1,36 s, ou seja, aproximadamente 14,7 tokens/s. Sao valores preliminares, a
+  serem medidos de forma sistematica na proxima etapa.
+
+Ainda nao disponiveis (proxima etapa): as medicoes quantitativas sistematicas
+de latencia, vazao, sobrecarga de comunicacao, WAN simulada e tolerancia a
+falhas descritas na Secao 5.4.
+
+--------------------------------------------------------------------
+
+7. CONCLUSAO (PARCIAL) E PROXIMOS PASSOS
+
+A etapa de viabilidade tecnica foi concluida com exito: a stack congelada e (na
+pratica) nao mantida do Petals foi reproduzida de forma identica em duas
+maquinas heterogeneas (Apple Silicon e x86 Ubuntu), superando obstaculos nao
+triviais de proxy corporativo, versao de Python, sistema de build e o novo CDN
+Xet do HuggingFace. Alem disso, a primeira inferencia distribuida ponta a ponta
+ja foi realizada com sucesso, com o forward atravessando os dois nos - o que
+valida, em escala domestica, o mecanismo central do Petals. Esse resultado, por
+si so, sustenta a viabilidade da proposta e antecipa parte das limitacoes a
+serem discutidas (dependencias congeladas, ausencia de GPU/quantizacao, escala
+domestica, LAN em vez de WAN real - esta mitigada por simulacao).
+
+Proximos passos:
+
+  1. Consolidar a operacao do swarm de dois nos (ja validada com a primeira
+     inferencia distribuida) e automatizar o lancamento dos nos.
+
+  2. Implementar o harness de medicao (registro de tokens/s e bytes
+     transferidos em CSV).
+
+  3. Executar a matriz de experimentos (Secao 5.4), incluindo o experimento
+     central do modelo que "nao cabe em um no".
+
+  4. Consolidar resultados em graficos/tabelas e redigir a versao final no
+     template SBC.
+
+--------------------------------------------------------------------
+
+REFERENCIAS
+
+BORZUNOV, A. et al. Petals: Collaborative Inference and Fine-tuning of Large
+  Models. Proceedings of the 61st Annual Meeting of the ACL (System
+  Demonstrations), 2023, p. 558-568.
+
+BORZUNOV, A. et al. Distributed Inference and Fine-tuning of Large Language
+  Models Over The Internet. Advances in Neural Information Processing Systems
+  (NeurIPS), v. 36, 2023.
+
+RYABININ, M. et al. SWARM Parallelism: Training Large Models Can Be
+  Surprisingly Communication-Efficient. Proceedings of the 40th ICML, PMLR
+  v. 202, 2023, p. 29416-29440.
+
+RYABININ, M.; GUSEV, A. Towards Crowdsourced Training of Large Neural Networks
+  using Decentralized Mixture-of-Experts. NeurIPS, v. 33, 2020.
+
+Learning@home. Hivemind: Decentralized Deep Learning in PyTorch. Disponivel em:
+  https://github.com/learning-at-home/hivemind
+
+BigScience. Petals. Disponivel em:
+  https://github.com/bigscience-workshop/petals

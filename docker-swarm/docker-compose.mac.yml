@@ -1,0 +1,63 @@
+# Run on the Mac. Three resource tiers simulating heterogeneous nodes on one host.
+# Requires FOUNDER_MADDR in .env (see docker-swarm/README.md). MPS is NOT available
+# inside Linux containers on Docker Desktop — these run CPU-only despite the M4 Pro host.
+services:
+  mac-fast:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 4
+    mem_limit: 4g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 9 --device cpu --torch_dtype float32
+      --identity_path /cache/fast.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31339
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31339
+    ports: ["31339:31339/tcp"]
+    volumes: ["mac-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  mac-medium:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 2
+    mem_limit: 2g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 4 --device cpu --torch_dtype float32
+      --identity_path /cache/medium.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31340
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31340
+    ports: ["31340:31340/tcp"]
+    volumes: ["mac-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  mac-slow:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 1
+    mem_limit: 1g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 1 --device cpu --torch_dtype float32
+      --identity_path /cache/slow.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31341
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31341
+    ports: ["31341:31341/tcp"]
+    volumes: ["mac-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  # Ad-hoc end-to-end test: docker compose --profile client run --rm client
+  client:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    profiles: ["client"]
+    command: python docker-swarm/client_test.py
+    environment:
+      - HF_HUB_DISABLE_XET=1
+      - FOUNDER_MADDR=${FOUNDER_MADDR}
+    volumes:
+      - ./client_test.py:/app/docker-swarm/client_test.py:ro
+      - mac-cache:/cache
+
+volumes:
+  mac-cache:

@@ -1,0 +1,8 @@
+# Swarm bloom-560m (24 blocos) — LAN doméstica
+# Fundador: T490 (192.168.2.109), blocos 0:12, porta 31337
+T490_BLOCKS=0:12
+T490_MADDR=/ip4/192.168.2.109/tcp/31337/p2p/12D3KooWE8Fttrf6BF4RW42eKv8r8avzCxv5CbTFxtWbvReWji9Z
+
+# Segundo nó: Mac (192.168.2.163), blocos 12:24, porta 31338
+MAC_BLOCKS=12:24
+MAC_MADDR=/ip4/192.168.2.163/tcp/31338/p2p/<preenchido-apos-subir>

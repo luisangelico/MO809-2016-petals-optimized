@@ -1,0 +1,12 @@
+# Upstream clones — separate git repos, not part of this project's history
+hivemind/
+petals/
+
+.DS_Store
+__pycache__/
+*.pyc
+
+# Per-host fill-in-the-blanks env files (LAN IPs, founder maddr) — keep the .example templates
+docker-swarm/.env
+docker-swarm/.env.*
+!docker-swarm/.env.*.example

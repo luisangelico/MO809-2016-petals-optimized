@@ -1,0 +1,34 @@
+# Run on T490. Founder node for the swarm (--new_swarm) + one "slow"-tier node.
+# Bring-up order: see docker-swarm/README.md (t490-founder must come up first).
+services:
+  t490-founder:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 2
+    mem_limit: 2g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 4 --device cpu --torch_dtype float32
+      --new_swarm --identity_path /cache/founder.id
+      --host_maddrs /ip4/0.0.0.0/tcp/31337
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31337
+    ports: ["31337:31337/tcp"]
+    volumes: ["t490-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  t490-slow:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 1
+    mem_limit: 1g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 1 --device cpu --torch_dtype float32
+      --identity_path /cache/slow.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31338
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31338
+    ports: ["31338:31338/tcp"]
+    volumes: ["t490-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+volumes:
+  t490-cache:
