@@ -28,6 +28,9 @@ def main(argv=None):
     parser.add_argument("--max_new", type=int, default=20)
     parser.add_argument("--csv", default=None, help="append one instrumentation row per request to this CSV")
     parser.add_argument("--n_requests", type=int, default=1, help="repeat the request this many times")
+    parser.add_argument("--baseline", action="store_true", help="true Petals default routing (vanilla baseline, single fast tier)")
+    parser.add_argument("--expected", default=None, help="known expected continuation for task exact-match (e.g. LAMBADA)")
+    parser.add_argument("--measure_quality", action="store_true", help="measure NLL/token-agreement vs a local fp32 reference per request")
     args = parser.parse_args(argv)
 
     from router.client import OptimizedClient
@@ -38,10 +41,17 @@ def main(argv=None):
     csv_logger = CSVLogger(args.csv) if args.csv else None
 
     try:
-        client = OptimizedClient(initial_peers=args.initial_peers, models=args.models)
+        client = OptimizedClient(
+            initial_peers=args.initial_peers,
+            models=args.models if not args.baseline else [args.models[0]],
+            baseline=args.baseline,
+            measure_output_quality=args.measure_quality,
+        )
         client.warmup()
         for _ in range(args.n_requests):
-            text = client.generate(args.prompt, objective=objective, max_new_tokens=args.max_new, csv_logger=csv_logger)
+            text = client.generate(
+                args.prompt, objective=objective, max_new_tokens=args.max_new, csv_logger=csv_logger, expected=args.expected
+            )
             print("\n===== RESULT =====")
             print("objective:", objective)
             print("text:", repr(text))

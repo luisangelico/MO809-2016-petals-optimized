@@ -50,11 +50,22 @@ class OptimizedClient:
         torch_dtypes: Optional[Dict[str, torch.dtype]] = None,
         quality_table: Optional[QualityTable] = None,
         quality_scale_s: float = 20.0,
+        baseline: bool = False,
+        measure_output_quality: bool = False,
+        device: str = "cpu",
     ):
         self.initial_peers = list(initial_peers)
         self.models: Dict[str, _LoadedModel] = {}
         self.quality_table = quality_table or QualityTable.load()
-        self.selector = ModelSelector(self.quality_table)
+        self.baseline = baseline
+        self.policy_name = "vanilla" if baseline else "optimized"
+        # With baseline=True, models keep the original RemoteSequenceManager (true Petals
+        # default routing) — the baseline for comparing the optimizer against.
+        if not baseline:
+            self.selector = ModelSelector(self.quality_table)
+        self.measure_output_quality = measure_output_quality
+        self.device = device
+        self._references: Dict[str, "ReferenceEvaluator"] = {}
         self.dtypes = torch_dtypes or {name: torch.float32 for name in models}
         self.dht: Optional[DHT] = None
 
@@ -68,10 +79,19 @@ class OptimizedClient:
             # Reuse the first model's DHT (created inside its sequence manager) for all tiers.
             if self.dht is None:
                 self.dht = model.transformer.h.sequence_manager.dht
-            self._install_optimizer(model, name, quality_scale_s)
+            if not baseline:
+                self._install_optimizer(model, name, quality_scale_s)
             tokenizer = AutoTokenizer.from_pretrained(name)
             self.models[name] = _LoadedModel(model=model, tokenizer=tokenizer)
             logger.info(f"Loaded {name} ({len(model.transformer.h)} blocks)")
+
+    def _reference(self, model_name: str) -> "ReferenceEvaluator":
+        """Lazy local fp32 reference evaluator for measuring output quality."""
+        if model_name not in self._references:
+            from router.quality_eval import ReferenceEvaluator
+
+            self._references[model_name] = ReferenceEvaluator(model_name, device=self.device)
+        return self._references[model_name]
 
     def _install_optimizer(self, model, name: str, quality_scale_s: float):
         """Replace the model's default sequence manager with the request-aware subclass."""
@@ -97,14 +117,23 @@ class OptimizedClient:
         max_new_tokens: int = 20,
         csv_logger: Optional[CSVLogger] = None,
         measure_ttft: bool = True,
+        expected: Optional[str] = None,
     ) -> str:
-        """One generation request routed by `objective`; appends an instrumentation row."""
-        objective = objective or Objective()
-        record = RequestRecord(objective=str(objective), alpha=objective.alpha)
+        """One generation request routed by `objective`; appends an instrumentation row.
 
-        t0 = time.perf_counter()
+        With `expected` set (e.g. a LAMBADA continuation), `task_match` is recorded.
+        With `measure_output_quality=True` (client flag), NLL-under-fp32-reference and
+        token agreement vs the fp32 greedy continuation are measured per request.
+        """
+        objective = objective or Objective()
+        record = RequestRecord(policy=self.policy_name, objective=str(objective), alpha=objective.alpha)
+
         try:
-            model_name = self.selector.choose(objective, self._candidates())
+            if self.baseline:
+                # True Petals default: single fast tier, vanilla routing, no selection.
+                model_name = next(iter(self.models))
+            else:
+                model_name = self.selector.choose(objective, self._candidates())
             record.model = model_name
             loaded = self.models[model_name]
             policy = loaded.model.transformer.h.sequence_manager
@@ -128,16 +157,27 @@ class OptimizedClient:
 
             record.n_tokens = max_new_tokens
             record.tok_s = max_new_tokens / record.gen_time_s if record.gen_time_s > 0 else float("nan")
-            record.decision_time_s = policy.last_decision_time_s
+            # Optimized policy exposes its last decision; vanilla has no such attributes.
+            record.decision_time_s = getattr(policy, "last_decision_time_s", float("nan"))
             record.predicted_latency_s = _sum_route_latency(policy)
-            record.route = route_repr(policy.last_spans)
-            record.n_spans = len(policy.last_spans or [])
-            record.quality_ppl = policy._route_perplexity(policy.last_spans or [], 0, len(policy))
+            record.route = route_repr(getattr(policy, "last_spans", None))
+            record.n_spans = len(getattr(policy, "last_spans", None) or [])
+            if hasattr(policy, "_route_perplexity"):
+                record.quality_ppl = policy._route_perplexity(policy.last_spans or [], 0, len(policy))
             dtype_bytes = _dtype_num_bytes(self.dtypes.get(model_name, torch.float32))
             record.activation_bytes_per_token_est = estimate_activation_bytes(
                 loaded.model.config.hidden_size, dtype_bytes, record.n_spans
             )
             text = loaded.tokenizer.decode(out[0], skip_special_tokens=True)
+
+            # Measured quality (divergence vs FP32 reference + task exact-match)
+            if expected:
+                record.expected = expected
+                record.task_match = str(self._reference(model_name).task_match(text, expected))
+            if self.measure_output_quality:
+                reference = self._reference(model_name)
+                record.ref_nll_per_token = reference.nll_of_generated(prompt, text)
+                record.token_agreement = reference.agreement(prompt, text, max_new_tokens)
         except Exception as e:
             record.error = repr(e)
             logger.warning(f"Request failed: {e!r}")
@@ -168,8 +208,8 @@ class OptimizedClient:
         return candidates
 
     def warmup(self):
-        """Warm the DHT route and pings with one short request per tier."""
-        for name in self.models:
+        """Warm the DHT route and pings with one short request."""
+        if not self.baseline:
             self.selector.choose(Objective(alpha=0.0), self._candidates())  # refresh candidates
         self.generate("Hello", objective=Objective(alpha=0.0), max_new_tokens=1)
 

@@ -17,6 +17,7 @@ from typing import List, Optional
 _FIELDS = [
     "timestamp",
     "request_id",
+    "policy",  # "optimized" | "vanilla" (true Petals default routing, baseline)
     "model",
     "objective",
     "alpha",
@@ -28,7 +29,11 @@ _FIELDS = [
     "gen_time_s",
     "n_tokens",
     "tok_s",
-    "quality_ppl",
+    "quality_ppl",  # predicted route perplexity (quality table)
+    "ref_nll_per_token",  # measured: NLL of the generated text under the local fp32 reference
+    "token_agreement",  # measured: fraction of tokens matching the fp32 greedy continuation
+    "expected",
+    "task_match",  # measured: exact-match for prompts with a known continuation
     "activation_bytes_per_token_est",
     "error",
 ]
@@ -36,6 +41,7 @@ _FIELDS = [
 
 @dataclasses.dataclass
 class RequestRecord:
+    policy: str = "optimized"
     model: str = ""
     objective: str = ""
     alpha: float = float("nan")
@@ -48,6 +54,10 @@ class RequestRecord:
     n_tokens: int = 0
     tok_s: float = float("nan")
     quality_ppl: float = float("nan")
+    ref_nll_per_token: float = float("nan")
+    token_agreement: float = float("nan")
+    expected: str = ""
+    task_match: str = ""
     activation_bytes_per_token_est: int = 0
     error: str = ""
 
