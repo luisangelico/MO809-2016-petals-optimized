@@ -47,6 +47,38 @@ services:
     volumes: ["mac-cache:/cache"]
     environment: ["HF_HUB_DISABLE_XET=1"]
 
+  # bf16 replica overlapping the fast tier — the optimizer's per-block precision choice
+  mac-fast-bf16:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 4
+    mem_limit: 3g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 9 --device cpu --torch_dtype bfloat16
+      --identity_path /cache/fast-bf16.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31346
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31346
+    ports: ["31346:31346/tcp"]
+    volumes: ["mac-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  # "Accurate" model tier: full bloom-1b7 in bf16 (~3.4 GB weights) on one replica
+  mac-1b7:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 4
+    mem_limit: 6g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-1b7
+      --num_blocks 24 --device cpu --torch_dtype bfloat16
+      --identity_path /cache/oneb7.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31347
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31347
+    ports: ["31347:31347/tcp"]
+    volumes: ["mac-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
   # Ad-hoc end-to-end test: docker compose --profile client run --rm client
   client:
     image: 192.168.2.109:5000/petals-swarm:latest
@@ -57,6 +89,22 @@ services:
       - FOUNDER_MADDR=${FOUNDER_MADDR}
     volumes:
       - ./client_test.py:/app/docker-swarm/client_test.py:ro
+      - mac-cache:/cache
+
+  # Route-optimizer client: objective-aware generation + CSV instrumentation
+  # docker compose -f docker-compose.mac.yml --profile router-client run --rm router-client
+  router-client:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    profiles: ["router-client"]
+    command: >
+      python router/run_client.py
+      --initial_peers ${FOUNDER_MADDR}
+      --objective alpha=0.5 --max_new 20
+      --csv experiments/router-client.csv
+    environment:
+      - HF_HUB_DISABLE_XET=1
+      - FOUNDER_MADDR=${FOUNDER_MADDR}
+    volumes:
       - mac-cache:/cache
 
 volumes:

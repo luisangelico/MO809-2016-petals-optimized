@@ -1,0 +1,11 @@
+{
+  "_comment": "Validation perplexity per (model, dtype) on a WikiText-2 subset. Regenerate with: python router/measure_quality.py",
+  "bloom-560m": {
+    "float32": 22.0,
+    "bfloat16": 22.3
+  },
+  "bloom-1b7": {
+    "float32": 14.2,
+    "bfloat16": 14.5
+  }
+}

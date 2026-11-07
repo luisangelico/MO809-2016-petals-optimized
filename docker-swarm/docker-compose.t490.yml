@@ -30,5 +30,37 @@ services:
     volumes: ["t490-cache:/cache"]
     environment: ["HF_HUB_DISABLE_XET=1"]
 
+  # bf16 replica of the same blocks — gives the route optimizer a per-block precision choice
+  t490-bf16:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 2
+    mem_limit: 2g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 4 --device cpu --torch_dtype bfloat16
+      --identity_path /cache/bf16.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31344
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31344
+    ports: ["31344:31344/tcp"]
+    volumes: ["t490-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  # "Accurate" model tier: full bloom-1b7 in bf16 (~3.4 GB weights) on one replica
+  t490-1b7:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 4
+    mem_limit: 6g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-1b7
+      --num_blocks 24 --device cpu --torch_dtype bfloat16
+      --identity_path /cache/oneb7.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31345
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31345
+    ports: ["31345:31345/tcp"]
+    volumes: ["t490-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
 volumes:
   t490-cache:

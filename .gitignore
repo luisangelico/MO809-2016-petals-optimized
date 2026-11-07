@@ -10,3 +10,6 @@ __pycache__/
 docker-swarm/.env
 docker-swarm/.env.*
 !docker-swarm/.env.*.example
+
+# Experiment outputs (CSV instrumentation rows, plots)
+experiments/

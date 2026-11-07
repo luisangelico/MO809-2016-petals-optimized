@@ -1,9 +1,18 @@
 # Dockerized heterogeneous Petals swarm (Mac + T490 + T14)
 
-7 virtual nodes across 3 physical hosts: `bloom-560m` (24 blocks) split unevenly across
-fast/medium/slow resource tiers (`cpus:`/`mem_limit:` per container). This is the
-block-replicated, heterogeneous substrate the route optimizer evaluates — see the
-top-level `README.md` for the project context.
+11 virtual nodes across 3 physical hosts:
+
+- **7 × `bloom-560m` fp32** (the original layout) across fast/medium/slow resource tiers
+  (`cpus:`/`mem_limit:` per container) — the default/always-fast baseline substrate.
+- **2 × `bloom-560m` bf16 replicas** (`mac-fast-bf16`, `t490-bf16`) overlapping the fp32
+  ranges — the optimizer's per-block precision choice (distinguishable via
+  `ServerInfo.torch_dtype` in the DHT, no server-side changes).
+- **2 × `bloom-1b7` bf16** (`mac-1b7`, `t490-1b7`, full 24-block model, `mem_limit: 6g`) —
+  the "accurate" model tier. Block ranges converge via Petals' least-loaded balancing
+  (`block_selection.py`), so fp32 and bf16 replicas naturally overlap.
+
+The route optimizer (`router/`, copied into the image) reads each request's objective and
+selects per request the model tier and the fp32/bf16 replicas. See the top-level README.
 
 All commands below must be run from each machine's own terminal (the LAN is not
 reachable from a sandboxed tool shell).
@@ -72,7 +81,23 @@ Prints time-to-first-token and tok/s for a short generation routed across whiche
 nodes are online. Compare against the bare-metal 2-node baseline (~14.7 tok/s,
 `swarm-run/`) to separate "more/smaller nodes" overhead from "containerization" overhead.
 
-## 5. Fault-tolerance smoke test
+## 5. Route-optimizer client
+
+```bash
+docker compose -f docker-compose.mac.yml --profile router-client run --rm router-client
+```
+Runs `router/run_client.py` inside the swarm network: objective-aware generation with
+CSV instrumentation (experiments CSV lands inside the container's `/app/experiments` —
+add `--csv` mounted out if you want it on the host). Change the objective in the
+compose command or run ad hoc:
+
+```bash
+docker compose -f docker-compose.mac.yml --profile router-client run --rm router-client \
+  python router/run_client.py --initial_peers $FOUNDER_MADDR \
+  --objective quality_floor=16ppl --max_new 30 --csv - 
+```
+
+## 6. Fault-tolerance smoke test
 
 Stop any `*-slow` or `*-medium` container mid-generation (`docker stop <container>`) and
 re-run the client — confirms DHT rerouting around the missing node.

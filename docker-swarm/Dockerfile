@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir --no-build-isolation \
 COPY petals /app/petals
 RUN pip install --no-cache-dir --no-build-isolation /app/petals
 
+# Route optimizer (request-aware routing extension, imports installed petals)
+COPY router /app/router
+
 ENV HF_HUB_DISABLE_XET=1
 ENV HF_HOME=/cache/huggingface
 VOLUME /cache

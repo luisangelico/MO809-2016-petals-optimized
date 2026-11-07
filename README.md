@@ -48,13 +48,59 @@ Quantization (bitsandbytes 8-bit/NF4) is unavailable here — it requires CUDA.
 ## Repo layout
 
 ```
+router/          The request-aware route optimizer (extension package; petals stays pristine)
 swarm-run/       Bare-metal 2-node swarm: client test script, server log, peer maddr
-docker-swarm/    Dockerized heterogeneous swarm (7 virtual nodes / 3 hosts) — see its README
+docker-swarm/    Dockerized heterogeneous swarm (11 virtual nodes / 3 hosts) — see its README
 apresentacao/    Final-project proposal slide deck (generator script)
 ```
 
 The upstream `hivemind/` and `petals/` checkouts are working copies only — they are
 gitignored and not part of this repo.
+
+## How the optimizer works
+
+- **`router/objectives.py`** — a per-request `Objective`: `alpha` (0 = pure latency …
+  1 = pure quality), an optional `latency_budget` or `quality_floor` (perplexity ceiling).
+- **`router/policy.py`** — `RequestAwareSequenceManager` subclasses Petals'
+  `RemoteSequenceManager` (upstream checkout untouched). It mirrors Petals' Dijkstra
+  graph topology but keeps **latency** and **quality** edge weights separately and
+  combines them as `cost = (1-α)·latency + α·quality_cost`. Constrained objectives
+  (budget/floor) walk the weight until the predicted route satisfies the constraint.
+  Petals' failure handling (banned peers, DHT rerouting) is inherited unchanged.
+- **`router/quality.py`** — perplexity per (model, precision) pair, keyed off
+  `ServerInfo.torch_dtype` (already announced to the DHT — fp32/bf16 replicas are
+  client-visible with zero server-side changes). Measured offline by
+  `router/measure_quality.py` (WikiText-2 sliding-window perplexity).
+- **`router/selector.py`** — decision level 1: which model tier (fast 560m vs accurate
+  1b7) serves this request.
+- **`router/client.py`** — `OptimizedClient`: both tiers over one shared DHT; per
+  `generate()` call it selects the tier, routes blocks by objective, and appends a CSV
+  instrumentation row (TTFT, tok/s, decision time, route, activation bytes estimate).
+
+## Running it
+
+Against a live swarm (bare-metal or Docker):
+
+```bash
+python router/run_client.py --initial_peers /ip4/<FOUNDER_LAN_IP>/tcp/31337 \
+  --objective alpha=0.3 --prompt "The capital of France is" --max_new 20 \
+  --csv experiments/run1.csv
+```
+
+Objectives: `alpha=<0..1>` | `latency_budget=<seconds>` | `quality_floor=<ppl>ppl`.
+Baselines and the Pareto sweep:
+
+```bash
+python router/bench.py --initial_peers ... sweep --alphas 0 0.25 0.5 0.75 1 --baselines
+python router/bench.py --initial_peers ... mixed --n_lat 4 --n_qual 4
+```
+
+Regenerate the quality table offline (no swarm needed, uses the conda env):
+
+```bash
+export HF_HUB_DISABLE_XET=1
+python router/measure_quality.py --models bigscience/bloom-560m bigscience/bloom-1b7
+```
 
 ## Evaluation
 
