@@ -1,9 +1,9 @@
 # Dockerized heterogeneous Petals swarm (Mac + T490 + T14)
 
 7 virtual nodes across 3 physical hosts: `bloom-560m` (24 blocks) split unevenly across
-fast/medium/slow resource tiers (`cpus:`/`mem_limit:` per container). See
-`/Users/luishenriqueangelico/.claude/plans/adaptive-fluttering-truffle.md` for the full
-design rationale and the node-layout table.
+fast/medium/slow resource tiers (`cpus:`/`mem_limit:` per container). This is the
+block-replicated, heterogeneous substrate the route optimizer evaluates — see the
+top-level `README.md` for the project context.
 
 All commands below must be run from each machine's own terminal (the LAN is not
 reachable from a sandboxed tool shell).

@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project (MO809A final project)
+
+**Optimized Petals: request-aware route optimization for distributed LLM inference.**
+Not just reproducing Petals — extending its client-side routing
+(`src/petals/client/routing/sequence_manager.py`, `RemoteSequenceManager`) to decide
+*per request* which nodes/replicas to use, based on a declared objective
+(latency-sensitive vs quality-sensitive). Cost function = measured latency/throughput +
+quality score, parameterized per objective (α weight, latency SLA, or quality floor);
+hierarchical decision (per-request model selection, then per-block replica/precision/node
+selection). Evaluated as a Pareto frontier (latency × quality) against baselines:
+Petals default routing, always-fast, always-accurate, random. Metrics: TTFT, tok/s,
+perplexity/divergence vs FP32, activation bytes per token, optimizer decision overhead.
+Experiments: α sweep, network degradation (`tc netem` / Network Link Conditioner),
+mixed concurrent loads, fault injection mid-generation. Testbed: heterogeneous 2-node
+LAN swarm (Mac M4 Pro via MPS + Lenovo T490 CPU; optional T14), with a Dockerized
+7-virtual-node variant in `docker-swarm/`. The full proposal is in
+`apresentacao/` and the progress report in `relatorio-parcial.txt` (Portuguese).
+
 ## Workspace layout
 
 This is a **research workspace containing two separate, upstream Python projects** (not a monorepo — each has its own build config, git origin, and test suite):
@@ -63,7 +81,8 @@ A GitNexus MCP server and its skills (`gitnexus-exploring`, `gitnexus-debugging`
 
 ## Local environment (this M4 Pro Mac — verified working install)
 
-Context: this is a course workspace (MO809A final project — reproducing Petals distributed inference at home). The Petals stack was installed and smoke-tested successfully on this machine (Apple Silicon arm64, macOS). Reuse the conda env `petals-mo809` (Python 3.11) — the base Python is 3.13, which is too new for the pinned `transformers==4.43.1` / `bitsandbytes==0.41.1`.
+Context: this is a course workspace (MO809A final project — see the "Project" section
+above). The Petals stack was installed and smoke-tested successfully on this machine (Apple Silicon arm64, macOS). Reuse the conda env `petals-mo809` (Python 3.11) — the base Python is 3.13, which is too new for the pinned `transformers==4.43.1` / `bitsandbytes==0.41.1`.
 
 **Corporate proxy (critical):** the machine sits behind a Bayer MITM proxy. `curl` works (system keychain) but conda/pip/git use their own CA store and fail with `CERTIFICATE_VERIFY_FAILED`. Export the corporate CA bundle before *any* conda/pip/git network command:
 
