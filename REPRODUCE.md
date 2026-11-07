@@ -10,7 +10,7 @@ aggregated by `router/summarize.py` — nothing is transcribed by hand.
 |---|---|---|
 | Lenovo T490 (Ubuntu 24.04, x86, 24 GB) | `t490-founder`, `t490-slow`, `t490-bf16`, `t490-1b7` | swarm founder + slow/medium tiers |
 | MacBook M4 Pro (arm64, macOS) | `mac-fast`, `mac-medium`, `mac-slow`, `mac-fast-bf16`, `mac-1b7` | fast tier + client runs |
-| Lenovo T14 (corporate, best-effort) | `t14-medium`, `t14-slow` | optional bonus; drop if blocked |
+| Lenovo T14 (corporate) | `t14-medium`, `t14-slow`, `t14-bf16` | medium/slow tiers on the worst-case link; netem + fault-injection target |
 
 Quality axes the optimizer routes over: model tier (`bloom-560m` fast vs `bloom-1b7`
 accurate) and precision (fp32 vs bf16 replicas), distinguishable by the client via
@@ -96,25 +96,31 @@ export REQUESTS_CA_BUNDLE=$B SSL_CERT_FILE=$B PIP_CERT=$B GIT_SSL_CAINFO=$B
 5. **Bring up the Mac services** (after `FOUNDER_MADDR` is known; §4).
 6. **Network Link Conditioner** (macOS) for the Mac-side degradation runs.
 
-## 3. Lenovo T14 (optional, best-effort)
+## 3. Lenovo T14 (third participant, worst-case link)
 
-Corporate VPN/firewall may block inbound libp2p TCP. If a container's blocks never
-leave "joining", drop this host — the T490+Mac swarm stands alone.
+T14 runs behind the corporate network — its link is the worst case, which is exactly
+what experiment 2 (network degradation) and experiment 4 (fault injection) are for.
+If its containers never leave "joining" (VPN/firewall blocking libp2p), note the
+failure in the report and fall back to the T490+Mac swarm for the remaining runs.
 
 ```bash
 # /etc/docker/daemon.json → {"insecure-registries": ["192.168.2.109:5000"]}; restart docker
 docker compose -f docker-swarm/docker-compose.t14.yml up -d
 ```
 
+T14 also gets `tc netem` inside its containers (same commands as §1.4) — apply the
+degradation there when running the degraded sweep, since it needs no extra hardware.
+
 ## 4. Swarm bring-up order (any restart)
 
 1. `t490-founder` first (`--new_swarm`) → read its announced
    `/ip4/<LAN_IP>/tcp/31337/p2p/<peer-id>` maddr from the logs.
 2. Set `FOUNDER_MADDR` in every host's `.env`, then bring up everything else:
-   T490 → Mac → T14 (if usable).
-3. Verify: every container logs its block range **online** (never stuck "joining").
-   A server stuck joining usually means the Xet CDN got hit — check
-   `HF_HUB_DISABLE_XET=1` is set in the container env (it is, in the image).
+   T490 → Mac → T14.
+3. Verify: every container logs its block range **online** (never stuck "joining") —
+   on T490, on the Mac, and on T14. If T14 stays stuck, record it and continue
+   without it (see §3). A server stuck joining usually means the Xet CDN got hit —
+   check `HF_HUB_DISABLE_XET=1` is set in the container env (it is, in the image).
 
 ## 5. Measurement protocol (scientific procedure)
 
@@ -150,8 +156,9 @@ before starting and do not change it between configurations.
    Link Conditioner (Mac host), re-run step 2 for each condition (e.g. 25/50/100 ms),
    then remove the conditioning.
 6. **Fault tolerance** (experiment 4): start a generation, `docker stop` one replica
-   container mid-run; the client's inherited Petals rerouting recovers — recovery time
-   is captured in the same CSV (`error` column + subsequent successful rows).
+   container mid-run — `t14-slow` is the natural target (worst-case host); the client's
+   inherited Petals rerouting recovers — recovery time is captured in the same CSV
+   (`error` column + subsequent successful rows).
 7. **Aggregation** (on the Mac, after collecting the CSVs from all hosts):
    ```bash
    python router/summarize.py experiments/sweep-*.csv --out results/sweep-summary.md
@@ -178,6 +185,7 @@ before starting and do not change it between configurations.
 - [ ] `router/quality_scores.json` regenerated (not the placeholder priors)
 - [ ] Fixed prompt set and repeats count, stated in the report
 - [ ] All CSVs under `experiments/` kept with their timestamps; summaries + plots under `results/`
-- [ ] Swarm topology recorded (which containers online, block ranges) at run time
+- [ ] Swarm topology recorded (which containers online on **all 3 hosts**, block ranges)
+      at run time; if T14 failed to join, that failure is recorded in the report
 - [ ] Network-conditioning parameters recorded for each degraded run
 - [ ] Docker image digest (`docker images --digests`) recorded per build

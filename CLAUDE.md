@@ -15,9 +15,9 @@ selection). Evaluated as a Pareto frontier (latency × quality) against baseline
 Petals default routing, always-fast, always-accurate, random. Metrics: TTFT, tok/s,
 perplexity/divergence vs FP32, activation bytes per token, optimizer decision overhead.
 Experiments: α sweep, network degradation (`tc netem` / Network Link Conditioner),
-mixed concurrent loads, fault injection mid-generation. Testbed: heterogeneous 2-node
-LAN swarm (Mac M4 Pro via MPS + Lenovo T490 CPU; optional T14), with a Dockerized
-7-virtual-node variant in `docker-swarm/`. The full proposal is in
+mixed concurrent loads, fault injection mid-generation. Testbed: 3-host heterogeneous
+LAN swarm (Mac M4 Pro via MPS + Lenovo T490 CPU + Lenovo T14 on the corporate network),
+with a Dockerized 12-virtual-node variant in `docker-swarm/`. The full proposal is in
 `apresentacao/` and the progress report in `relatorio-parcial.txt` (Portuguese).
 
 ## Workspace layout

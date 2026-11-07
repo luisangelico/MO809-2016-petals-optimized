@@ -1,11 +1,11 @@
 # Dockerized heterogeneous Petals swarm (Mac + T490 + T14)
 
-11 virtual nodes across 3 physical hosts:
+12 virtual nodes across 3 physical hosts:
 
 - **7 × `bloom-560m` fp32** (the original layout) across fast/medium/slow resource tiers
   (`cpus:`/`mem_limit:` per container) — the default/always-fast baseline substrate.
-- **2 × `bloom-560m` bf16 replicas** (`mac-fast-bf16`, `t490-bf16`) overlapping the fp32
-  ranges — the optimizer's per-block precision choice (distinguishable via
+- **3 × `bloom-560m` bf16 replicas** (`mac-fast-bf16`, `t490-bf16`, `t14-bf16`) overlapping
+  the fp32 ranges — the optimizer's per-block precision choice (distinguishable via
   `ServerInfo.torch_dtype` in the DHT, no server-side changes).
 - **2 × `bloom-1b7` bf16** (`mac-1b7`, `t490-1b7`, full 24-block model, `mem_limit: 6g`) —
   the "accurate" model tier. Block ranges converge via Petals' least-loaded balancing
@@ -68,8 +68,8 @@ T14 never builds — it only pulls `192.168.2.109:5000/petals-swarm:latest` (res
    `FOUNDER_MADDR` is set).
 6. On the Mac: `docker compose -f docker-compose.mac.yml up -d`.
 7. On T14: `docker compose -f docker-compose.t14.yml up -d`. If its blocks never leave
-   "joining" (corporate VPN/firewall blocking inbound TCP), drop it — the T490+Mac
-   5-node swarm still stands on its own.
+   "joining" (corporate VPN/firewall blocking inbound TCP), record the failure and
+   continue without T14 — the T490+Mac swarm still stands on its own.
 8. Confirm every container logs its own block range as online (not stuck "joining").
 
 ## 4. End-to-end test

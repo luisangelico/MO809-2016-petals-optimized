@@ -1,5 +1,7 @@
-# Run on T14. Best-effort node — corporate VPN/firewall may block inbound libp2p TCP;
-# if so, drop this host and keep the 5-node T490+Mac swarm (see docker-swarm/README.md).
+# Run on T14. Third participant in the experiment — corporate network is the
+# worst-case link, so this host doubles as the natural target for network-degradation
+# (tc netem) and fault-injection (docker stop) runs. If its blocks never leave
+# "joining" (VPN/firewall), fall back to the T490+Mac swarm (see docker-swarm/README.md).
 services:
   t14-medium:
     image: 192.168.2.109:5000/petals-swarm:latest
@@ -28,6 +30,23 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31343
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31343
     ports: ["31343:31343/tcp"]
+    volumes: ["t14-cache:/cache"]
+    environment: ["HF_HUB_DISABLE_XET=1"]
+
+  # bf16 replica of bloom-560m — overlaps block ranges with t14-medium so the
+  # optimizer has a per-block precision choice on this host too.
+  t14-bf16:
+    image: 192.168.2.109:5000/petals-swarm:latest
+    cpus: 2
+    mem_limit: 2g
+    command: >
+      python -m petals.cli.run_server bigscience/bloom-560m
+      --num_blocks 2 --device cpu --torch_dtype bfloat16
+      --identity_path /cache/bf16.id
+      --initial_peers ${FOUNDER_MADDR}
+      --host_maddrs /ip4/0.0.0.0/tcp/31344
+      --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31344
+    ports: ["31344:31344/tcp"]
     volumes: ["t14-cache:/cache"]
     environment: ["HF_HUB_DISABLE_XET=1"]
 

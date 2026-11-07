@@ -30,10 +30,11 @@ The full proposal is in [`apresentacao/`](apresentacao/) and the progress report
 |---|---|
 | Quality (coarse) | `bloom-560m` (fast) vs `bloom-1b7` (accurate) |
 | Quality (fine) | fp32 vs bf16/fp16 |
-| Latency (hardware) | MacBook M4 Pro (MPS, fast) vs Thinkpad T490 (CPU, slow) + stragglers |
+| Latency (hardware) | MacBook M4 Pro (MPS, fast) vs Thinkpad T490 (CPU, slow) vs Thinkpad T14 (corporate, worst-case link) + stragglers |
 
 Nodes: MacBook M4 Pro (arm64, macOS, GPU via MPS), Lenovo T490 (x86_64, Ubuntu 24.04,
-24 GB RAM, no GPU — swarm founder), Lenovo T14 (optional extra). Heterogeneity is an
+24 GB RAM, no GPU — swarm founder), Lenovo T14 (corporate network — the worst-case
+link, target for the degradation and fault-injection runs). Heterogeneity is an
 object of study, not a limitation — it is what makes per-request routing meaningful.
 
 ## Software stack (identical on every node, conda Python 3.11)
@@ -50,7 +51,7 @@ Quantization (bitsandbytes 8-bit/NF4) is unavailable here — it requires CUDA.
 ```
 router/          The request-aware route optimizer (extension package; petals stays pristine)
 swarm-run/       Bare-metal 2-node swarm: client test script, server log, peer maddr
-docker-swarm/    Dockerized heterogeneous swarm (11 virtual nodes / 3 hosts) — see its README
+docker-swarm/    Dockerized heterogeneous swarm (12 virtual nodes / 3 hosts) — see its README
 apresentacao/    Final-project proposal slide deck (generator script)
 ```
 
@@ -115,9 +116,10 @@ route composition), and optimizer overhead (route-decision time vs inference tim
 1. **Speed vs quality trade-off** — Pareto frontier sweeping the objective (α = 0 … 1),
    vs the baselines.
 2. **Adaptation to network/node degradation** — heterogeneity and stragglers via
-   `tc netem` (T490) / Network Link Conditioner (Mac).
+   `tc netem` (T490 + T14 containers) / Network Link Conditioner (Mac).
 3. **Mixed concurrent loads** — simultaneous latency-sensitive and quality-sensitive requests.
-4. **Fault tolerance mid-generation** — kill a node, measure DHT re-discovery and reroute time.
+4. **Fault tolerance mid-generation** — kill a node (e.g. `docker stop` a T14
+   container), measure DHT re-discovery and reroute time.
 
 ## Current status
 
@@ -162,10 +164,11 @@ python swarm-run/client_test.py
 
 ## Dockerized variant
 
-[`docker-swarm/`](docker-swarm/README.md) scales the same setup to **7 virtual nodes
+[`docker-swarm/`](docker-swarm/README.md) scales the same setup to **12 virtual nodes
 across the 3 physical hosts**, with per-container `cpus:`/`mem_limit:` tiers (fast /
-medium / slow), a local image registry on the T490, and multi-arch builds (amd64 +
-arm64) — the block-replicated, heterogeneous substrate the route optimizer studies.
+medium / slow), bf16 replicas of the fast tier, a local image registry on the T490, and
+multi-arch builds (amd64 + arm64) — the block-replicated, heterogeneous substrate the
+route optimizer studies.
 
 ## References
 
