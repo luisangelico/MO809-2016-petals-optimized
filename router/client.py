@@ -157,13 +157,28 @@ class OptimizedClient:
 
             record.n_tokens = max_new_tokens
             record.tok_s = max_new_tokens / record.gen_time_s if record.gen_time_s > 0 else float("nan")
-            # Optimized policy exposes its last decision; vanilla has no such attributes.
-            record.decision_time_s = getattr(policy, "last_decision_time_s", float("nan"))
-            record.predicted_latency_s = _sum_route_latency(policy)
-            record.route = route_repr(getattr(policy, "last_spans", None))
-            record.n_spans = len(getattr(policy, "last_spans", None) or [])
-            if hasattr(policy, "_route_perplexity"):
-                record.quality_ppl = policy._route_perplexity(policy.last_spans or [], 0, len(policy))
+            # Per-request decision: the route manager is shared across concurrent requests,
+            # so prefer the context-local decision (set at decision time by make_sequence)
+            # over the manager's last_spans — reading the manager state after generation
+            # races under the mixed load and records whatever route was rebuilt last.
+            # The vanilla baseline has no such attributes (fields stay NaN).
+            from router.objectives import current_route
+
+            route_info = current_route.get() if not self.baseline else None
+            if route_info is not None:
+                record.decision_time_s = route_info["decision_time_s"]
+                record.predicted_latency_s = route_info["latency_s"]
+                record.route = route_repr(route_info["spans"])
+                record.n_spans = len(route_info["spans"])
+                record.quality_ppl = route_info["ppl"]
+            else:
+                # Optimized policy exposes its last decision; vanilla has no such attributes.
+                record.decision_time_s = getattr(policy, "last_decision_time_s", float("nan"))
+                record.predicted_latency_s = _sum_route_latency(policy)
+                record.route = route_repr(getattr(policy, "last_spans", None))
+                record.n_spans = len(getattr(policy, "last_spans", None) or [])
+                if hasattr(policy, "_route_perplexity"):
+                    record.quality_ppl = policy._route_perplexity(policy.last_spans or [], 0, len(policy))
             dtype_bytes = _dtype_num_bytes(self.dtypes.get(model_name, torch.float32))
             record.activation_bytes_per_token_est = estimate_activation_bytes(
                 loaded.model.config.hidden_size, dtype_bytes, record.n_spans
@@ -234,7 +249,7 @@ def _dtype_num_bytes(dtype: torch.dtype) -> int:
 
 def _sum_route_latency(policy: RequestAwareSequenceManager) -> float:
     """Latency-only sum of the last built route, from the policy's stored decision."""
-    spans = policy.last_spans
+    spans = getattr(policy, "last_spans", None)
     if not spans:
         return float("nan")
     # Per-block inference delays + one RTT-ish hop per span; a rough actual-latency proxy.

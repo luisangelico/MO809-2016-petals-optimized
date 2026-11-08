@@ -1,0 +1,363 @@
+<title>Optimized Petals — Request-Aware Routing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#FBFAF8; --card:#FFFFFF; --ink:#22252A; --muted:#6B6672;
+  --accent:#A8265B; --accent-soft:#F7E8EF; --line:#E7E4DF;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17181C; --card:#1E2025; --ink:#E9E7E4; --muted:#9B98A0;
+  --accent:#F06CA8; --accent-soft:#2A1E26; --line:#2C2E34;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#17181C; --card:#1E2025; --ink:#E9E7E4; --muted:#9B98A0;
+  --accent:#F06CA8; --accent-soft:#2A1E26; --line:#2C2E34;
+  color-scheme:dark;
+}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.65 'Source Sans 3',system-ui,sans-serif;
+  padding:0 20px;}
+main{max-width:820px;margin:0 auto;padding-block:0 64px;}
+h1,h2,h3{font-family:'Fraunces',Georgia,serif;line-height:1.2;text-wrap:balance;}
+h2{font-size:1.55rem;font-weight:650;margin:0 0 18px;}
+h3{font-size:1.12rem;font-weight:650;margin:26px 0 10px;}
+p{margin:0 0 14px;max-width:66ch;}
+a{color:var(--accent);}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
+  background:var(--bg);border-bottom:1px solid var(--line);
+  margin:0 -20px;padding:10px 20px;}
+.bar-in{max-width:820px;margin:0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.bar-name{font-family:'Fraunces',serif;font-weight:650;font-size:.98rem;}
+.bar-name span{color:var(--accent);}
+.langs{margin-left:auto;display:flex;gap:6px;}
+.langs a{font:600 .78rem/1 var(--mono);text-decoration:none;padding:5px 9px;
+  border:1px solid var(--line);border-radius:99px;color:var(--muted);}
+.langs a.on{background:var(--accent-soft);border-color:transparent;color:var(--accent);}
+nav.secoes{display:flex;flex-wrap:wrap;gap:6px;margin:22px 0 0;}
+nav.secoes a{font:500 .8rem/1 var(--mono);text-decoration:none;color:var(--muted);
+  padding:6px 10px;border:1px solid var(--line);border-radius:8px;}
+nav.secoes a:hover{color:var(--accent);border-color:var(--accent);}
+section{margin-top:52px;}
+.eyebrow{font:500 .74rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 8px;}
+.hero{padding-block:44px 8px;border-bottom:1px solid var(--line);}
+.hero h1{font-size:clamp(1.9rem,5.4vw,2.7rem);font-weight:650;margin:0 0 14px;max-width:24ch;}
+.hero .sub{font-size:1.06rem;color:var(--muted);max-width:60ch;}
+.numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:30px 0 6px;}
+.num{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+.num b{display:block;font:500 1.3rem/1.2 var(--mono);color:var(--accent);}
+.num span{font-size:.82rem;color:var(--muted);}
+.tabela{overflow-x:auto;margin:16px 0 8px;}
+table{border-collapse:collapse;width:100%;font:500 .85rem/1.5 var(--mono);font-variant-numeric:tabular-nums;}
+th{text-align:left;font-weight:500;color:var(--muted);border-bottom:2px solid var(--ink);padding:7px 12px 7px 0;white-space:nowrap;}
+td{border-bottom:1px solid var(--line);padding:7px 12px 7px 0;vertical-align:top;}
+td.destaque{color:var(--accent);font-weight:500;}
+.lista{padding-left:0;list-style:none;margin:0 0 14px;}
+.lista li{padding-left:26px;position:relative;margin-bottom:10px;max-width:66ch;}
+.lista li::before{content:"";position:absolute;left:6px;top:.62em;width:7px;height:7px;
+  border-radius:50%;background:var(--accent);}
+.fases{counter-reset:fase;list-style:none;padding:0;margin:0 0 14px;}
+.fases li{counter-increment:fase;position:relative;padding:0 0 18px 52px;max-width:62ch;}
+.fases li::before{content:counter(fase);position:absolute;left:0;top:0;
+  width:32px;height:32px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  font:500 .95rem/32px var(--mono);text-align:center;}
+.fases li:not(:last-child)::after{content:"";position:absolute;left:16px;top:36px;bottom:2px;width:1px;background:var(--line);}
+.fases b{display:block;font-family:'Fraunces',serif;font-size:1.02rem;}
+.leitura{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin:16px 0;}
+.leitura p{margin:0;}
+figure{margin:20px 0;}
+figure img{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;}
+figcaption{font-size:.84rem;color:var(--muted);margin-top:8px;}
+.mono{font-family:var(--mono);font-size:.92em;}
+footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
+  font-size:.88rem;color:var(--muted);}
+.refs{padding-left:22px;max-width:70ch;}
+.refs li{margin-bottom:10px;font-size:.92rem;}
+</style>
+
+<header class="bar"><div class="bar-in">
+  <div class="bar-name">Optimized <span>Petals</span> · MO809A</div>
+  <div class="langs"><a href="index.html">PT</a><a class="on" href="en.html">EN</a></div>
+</div></header>
+<main>
+
+<div class="hero">
+  <p class="eyebrow">Final report · Unicamp · Topics in Distributed Computing</p>
+  <h1>Request-aware route optimization for distributed LLM inference</h1>
+  <p class="sub">We extend <a href="https://github.com/bigscience-workshop/petals">Petals</a>'
+  client-side routing to decide <em>per request</em> which nodes and replicas to use —
+  latency or quality, according to a declared objective — keeping the upstream code untouched,
+  and evaluate the Pareto frontier (latency × quality) on a heterogeneous 3-host swarm.</p>
+  <div class="numeros">
+    <div class="num"><b>5</b><span>measured experiments</span></div>
+    <div class="num"><b>0.2–1.5 ms</b><span>decision overhead</span></div>
+    <div class="num"><b>+220%</b><span>TTFT under netem (α=0.5)</span></div>
+    <div class="num"><b>76%</b><span>LAMBADA accuracy (3 scenarios)</span></div>
+  </div>
+  <nav class="secoes">
+    <a href="#introduction">Introduction</a><a href="#background">Background</a>
+    <a href="#related">Related Work</a><a href="#proposal">Proposal</a>
+    <a href="#methodology">Methodology</a><a href="#results">Results</a>
+    <a href="#conclusion">Conclusion</a><a href="#references">References</a>
+  </nav>
+</div>
+
+<section id="introduction">
+  <p class="eyebrow">1 · Introduction</p>
+  <h2>The problem</h2>
+  <p>Large language models do not fit on a single machine: Petals splits a transformer into
+  blocks hosted on different computers, and a request traverses that node chain in sequence.
+  The default router (<span class="mono">RemoteSequenceManager</span>) picks servers optimizing
+  only <em>throughput and ping</em> — every request is routed identically.</p>
+  <p>This ignores the fact that requests differ: interactive traffic (chat, autocomplete) needs
+  <strong>low latency</strong>; summarization and reasoning <strong>tolerate more latency in
+  exchange for higher quality</strong>. Between these extremes lies a whole spectrum of
+  intermediate objectives.</p>
+  <h3>Motivation</h3>
+  <p>A home swarm is heterogeneous by nature: distinct hardware (Apple Silicon GPU vs. x86 CPUs),
+  distinct precisions (fp32 vs. bf16), and links of very different quality (home LAN vs. corporate
+  network). That heterogeneity — usually treated as a limitation — is exactly what makes
+  per-request routing <em>useful</em>: there are real choices to make on every request, and
+  choosing well changes both latency and quality.</p>
+  <h3>Objectives</h3>
+  <ul class="lista">
+    <li>Extend Petals' client-side routing to decide <em>per request</em> which nodes/replicas to
+    use, based on a declared objective (α ∈ [0, 1], latency budget, quality floor).</li>
+    <li>Keep the upstream Petals checkout untouched — the extension lives in a separate package
+    (<span class="mono">router/</span>) that subclasses
+    <span class="mono">RemoteSequenceManager</span>.</li>
+    <li>Evaluate as a Pareto frontier (latency × quality) against Petals' default routing.</li>
+    <li>Measure robustness: network degradation, concurrent mixed load, mid-generation node
+    failure, and accuracy on a real task (LAMBADA).</li>
+  </ul>
+</section>
+
+<section id="background">
+  <p class="eyebrow">2 · Background</p>
+  <h2>Concepts and fundamentals</h2>
+  <ul class="lista">
+    <li><strong>Distributed inference via pipeline parallelism</strong> — a transformer is cut into
+    consecutive blocks; each node hosts a range. Generating one token requires traversing all
+    blocks in order: per-token latency is the sum of every hop's delay along the route.</li>
+    <li><strong>DHT (Distributed Hash Table)</strong> — Hivemind runs a Kademlia-style DHT (libp2p)
+    to announce which nodes host which blocks and propagate metrics
+    (<span class="mono">ServerInfo</span>: dtype, RPS, free cache, pings).</li>
+    <li><strong>KV cache</strong> — the generation's attention memory lives <em>on the server</em>;
+    that is why an in-flight session cannot migrate to another node on failure.</li>
+    <li><strong>Perplexity and NLL</strong> — quality: offline perplexity per (model, precision)
+    on WikiText-2; divergence of generated text from a local fp32 reference.</li>
+    <li><strong>Pareto frontier</strong> — the set of routes where improving latency is only
+    possible by worsening quality. The α dial traverses it:
+    <span class="mono">cost = (1 − α)·latency + α·quality_cost</span>.</li>
+  </ul>
+</section>
+
+<section id="related">
+  <p class="eyebrow">3 · Related Work</p>
+  <h2>Comparable solutions</h2>
+  <div class="tabela"><table>
+    <tr><th>Work</th><th>What it does</th><th>Difference to this project</th></tr>
+    <tr><td>Petals<br><span style="color:var(--muted)">Borzunov et al., ACL 2023</span></td>
+        <td>Collaborative inference/fine-tuning of 100B+ LLMs</td>
+        <td>Routes only by throughput/ping, with no per-request objective — this project extends exactly that point</td></tr>
+    <tr><td>Hivemind / Learning@home<br><span style="color:var(--muted)">Ryabinin et al.</span></td>
+        <td>DHT, decentralized all-reduce, decentralized MoE</td>
+        <td>Provides the discovery and fault-tolerance infrastructure reused here</td></tr>
+    <tr><td>FlexGen<br><span style="color:var(--muted)">Sheng et al., ICML 2023</span></td>
+        <td>High-throughput inference on 1 GPU</td>
+        <td>Optimizes tensor placement on one node; here, the optimization is the <em>route</em> across nodes</td></tr>
+    <tr><td>vLLM / PagedAttention<br><span style="color:var(--muted)">Kwon et al., SOSP 2023</span></td>
+        <td>Server-side KV memory management</td>
+        <td>Acts on the server; this project acts on the client, choosing the route</td></tr>
+    <tr><td>Dijkstra / Kademlia<br><span style="color:var(--muted)">Maymounkov &amp; Mazières, IPTPS 2002</span></td>
+        <td>Shortest paths; XOR DHT</td>
+        <td>Algorithmic basis of the router and peer discovery</td></tr>
+  </table></div>
+</section>
+
+<section id="proposal">
+  <p class="eyebrow">4 · Proposal</p>
+  <h2>The objective-aware router</h2>
+  <p>Hierarchical decision on the client, two levels:</p>
+  <ol class="fases">
+    <li><b>Model selection</b> (<span class="mono">router/selector.py</span>)
+    given the objective, pick the tier — <span class="mono">bloom-560m</span> (fast) vs
+    <span class="mono">bloom-1b7</span> (accurate) — by predicted latency + quality score.</li>
+    <li><b>Replica/block selection</b> (<span class="mono">router/policy.py</span>)
+    <span class="mono">RequestAwareSequenceManager</span> subclasses Petals' manager and mirrors
+    its Dijkstra graph, but keeps latency and quality as separate edge weights, combined per
+    request: <span class="mono">cost = (1 − α)·latency + α·quality_cost</span>. Constrained
+    objectives walk the weight until the predicted route satisfies the constraint.</li>
+  </ol>
+  <p>The <strong>quality table</strong> (<span class="mono">router/quality.py</span>) stores
+  offline perplexity per (model, precision) on WikiText-2; each replica's dtype is already
+  announced to the DHT, so fp32/bf16 replicas are client-visible <em>with zero server-side
+  changes</em>. The objective travels per request in a <span class="mono">ContextVar</span>, and
+  Petals' failure handling (banned peers, DHT rerouting) is inherited unchanged. Every request
+  produces a CSV row: TTFT, tok/s, decision time, route, estimated activation bytes, NLL vs fp32
+  reference, and task accuracy.</p>
+</section>
+
+<section id="methodology">
+  <p class="eyebrow">5 · Methodology</p>
+  <h2>Testbed, metrics and protocol</h2>
+  <h3>Heterogeneous testbed (3 hosts)</h3>
+  <div class="tabela"><table>
+    <tr><th>Component</th><th>Detail</th></tr>
+    <tr><td>MacBook M4 Pro (arm64, macOS)</td><td>Servers via MPS; also runs the measurement client</td></tr>
+    <tr><td>Lenovo T490 (x86_64, Ubuntu 24.04, 24 GB)</td><td>Swarm founder (DHT, port 31337), CPU</td></tr>
+    <tr><td>Lenovo T14 (corporate network)</td><td>Worst link in the topology — target of experiments 2 and 4</td></tr>
+    <tr><td>Docker variant</td><td>12 virtual nodes across 3 hosts</td></tr>
+    <tr><td>Models</td><td>bloom-560m + bloom-1b7, 24 blocks each, fp32 and bf16 replicas</td></tr>
+    <tr><td>Stack</td><td>Petals 2.3.0.dev2 · Hivemind 1.2.0.dev0 (pinned commit) · transformers 4.43.1 · torch (CPU/MPS)</td></tr>
+  </table></div>
+  <h3>Metrics</h3>
+  <p>TTFT (time to first token) · tok/s · <strong>router decision time</strong> · route composition
+  (spans, precision, nodes) · activation bytes per token · NLL per token vs fp32 reference ·
+  token agreement · task accuracy (LAMBADA).</p>
+  <h3>Experiments</h3>
+  <div class="tabela"><table>
+    <tr><th>#</th><th>Experiment</th><th>Protocol</th></tr>
+    <tr><td>1</td><td>α sweep</td><td>α = 0 → 1 in 5 steps, same prompts → Pareto frontier; vanilla baseline</td></tr>
+    <tr><td>2</td><td>Network degradation</td><td><span class="mono">tc netem delay 150ms 50ms loss 2%</span> on the T14's medium node; before/after with α ∈ {0, 0.5, 1}</td></tr>
+    <tr><td>3</td><td>Mixed load</td><td>8 concurrent requests: 4 with α=0 + 4 with α=1, simultaneous</td></tr>
+    <tr><td>4</td><td>Fault injection</td><td><span class="mono">docker stop</span> of a route node mid-generation; recovery timeline</td></tr>
+    <tr><td>5</td><td>Accuracy (LAMBADA)</td><td>50 passages × {α=0, α=1, vanilla}; exact-match on the last word</td></tr>
+  </table></div>
+</section>
+
+<section id="results">
+  <p class="eyebrow">6 · Results</p>
+  <h2>Data and discussion</h2>
+
+  <h3>6.1 α sweep (Pareto frontier)</h3>
+  <div class="tabela"><table>
+    <tr><th>α</th><th>tok/s</th><th>TTFT (s)</th><th>Decision (ms)</th><th>NLL/tok vs fp32</th><th>Agreement</th></tr>
+    <tr><td>0.00</td><td>4.2 ± 0.0</td><td>1.29</td><td>0.5</td><td>1.133</td><td>1.00</td></tr>
+    <tr><td>0.25</td><td>4.2 ± 0.3</td><td>0.65</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+    <tr><td>0.50</td><td>4.2 ± 0.2</td><td>0.95</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+    <tr><td>0.75</td><td>4.3 ± 0.5</td><td>1.07</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+    <tr><td>1.00</td><td>3.9 ± 0.2</td><td>0.75</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+    <tr><td>vanilla</td><td>4.4 ± 0.3</td><td>0.50</td><td>—</td><td>—</td><td>—</td></tr>
+  </table></div>
+  <p>The route changes composition across α: with α=0 the route uses 5 spans on fast local hosts;
+  with α=1 the router includes the T14's fp32 span and the predicted perplexity drops
+  (22,075 → 22,025) at the cost of lower tok/s. Measured NLL is flat because every route serves
+  the same model — the quality dimension shows up in the <em>route cost</em>, not in the generated
+  text. Decision overhead: 0.2–0.6 ms per request (negligible).</p>
+  <figure>
+    <img src="assets/pareto-sweep.png" alt="Throughput and measured quality vs. α (Pareto frontier)">
+    <figcaption>Experiment 1: throughput declines at the quality extreme (4.2 → 3.9 tok/s) and
+    measured NLL stays flat — the same model on every route.</figcaption>
+  </figure>
+
+  <h3>6.2 Network degradation (netem)</h3>
+  <div class="tabela"><table>
+    <tr><th>α</th><th>TTFT before → after</th><th>tok/s before → after</th><th>Predicted latency before → after</th><th>Route changed?</th></tr>
+    <tr><td>0.0</td><td>0.58 → 0.31 s</td><td>4.43 → 4.70</td><td>0.84 → 0.84 s</td>
+        <td class="destaque">No — route doesn't touch the degraded node, zero damage</td></tr>
+    <tr><td>0.5</td><td>0.51 → 1.63 s (+220%)</td><td>3.42 → 1.49 (−56%)</td><td>0.91 → 0.94 s</td><td>No</td></tr>
+    <tr><td>1.0</td><td>0.43 → 1.56 s (+263%)</td><td>2.93 → 1.60 (−45%)</td><td>0.91 → 0.98 s</td><td>No</td></tr>
+  </table></div>
+  <p>The impact splits exactly along the objective: the latency route (α=0) doesn't use the
+  degraded node and takes no damage; the quality routes (α=0.5/1) go straight through it and
+  <strong>cannot detour</strong> — the blocks it hosts have single holders in this topology. The
+  predicted latency barely reacted (0.91 → 0.94 s) while actual TTFT tripled: the DHT's
+  ping-based RTT table refreshes too slowly to capture a sudden injected delay — the natural
+  extension is per-request RTT probes.</p>
+
+  <h3>6.3 Concurrent mixed load</h3>
+  <p>8 simultaneous requests (4 α=0 + 4 α=1): routes <strong>differentiated per group at the same
+  instant</strong> — α=0 → wide bf16 route (6 spans via mac-fast-bf16); α=1 → 7-span route through
+  the T14's fp32 spans. Per-request TTFT 0.61–1.60 s; decision time 0.2–1.5 ms; 0 errors. The
+  per-request instrumentation (the <span class="mono">current_route</span> ContextVar) eliminates
+  the race of reading the shared manager's state after generation.</p>
+
+  <h3>6.4 Mid-generation fault injection</h3>
+  <ol class="fases">
+    <li><b>Instant detection</b> — the connection error lands in the same second as the
+    <span class="mono">docker stop</span>.</li>
+    <li><b>Stale-DHT window (~5 min)</b> — the DHT keeps advertising the dead node; route rebuilds
+    keep picking it and the client backs off progressively (1 → 2 → 4 → … → 60 s).</li>
+    <li><b>Swarm self-recovery</b> — once the stale record expires, the DHT hands out live
+    replacement replicas and the lost block is covered again.</li>
+    <li><b>The interrupted request cannot migrate</b> — the KV cache lived on the node that died;
+    continuing on a fresh machine fails a length check
+    (<span class="mono">AssertionError('0 and N')</span>) and the request never completes —
+    while every <em>new</em> request works fine on the repaired topology.</li>
+  </ol>
+  <p>The swarm survives; the in-flight request does not — pointing at the natural extension:
+  re-sending the prefix to the new block holder on failover.</p>
+
+  <h3>6.5 Real-task accuracy (LAMBADA)</h3>
+  <div class="tabela"><table>
+    <tr><th>Scenario</th><th>Route</th><th>TTFT</th><th>tok/s</th><th>Accuracy</th></tr>
+    <tr><td>Optimizer α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
+    <tr><td>Optimizer α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
+    <tr><td>Vanilla</td><td>—</td><td>0.93 s</td><td>2.57</td><td class="destaque">38/50 = 76%</td></tr>
+  </table></div>
+  <p>Routing changes <strong>latency, not accuracy</strong>: the quality route (α=1) pays +40%
+  TTFT and −24% throughput to traverse the remote fp32 spans, but accuracy is identical — the
+  same model with deterministic greedy decoding produces the same text on any route. The potential
+  quality gain (full-precision blocks) shows up in route cost, not in exact-match. Decision
+  overhead: 0.37–0.44 ms.</p>
+</section>
+
+<section id="conclusion">
+  <p class="eyebrow">7 · Conclusion</p>
+  <h2>Summary and future work</h2>
+  <p>The project demonstrates that Petals' routing can be extended to <strong>per-request
+  decisions</strong> without touching upstream code: a declared objective (α, latency budget,
+  quality floor) selects model and replica via a latency × quality cost graph. The measurements
+  show:</p>
+  <ul class="lista">
+    <li>decision overhead is negligible (0.2–1.5 ms per request);</li>
+    <li>differentiated routes coexist under concurrent load without mutual degradation;</li>
+    <li>differentiated routes absorb network damage where the degraded node isn't needed — and
+    cannot avoid it when it is the sole holder of the blocks;</li>
+    <li>the latency × quality trade-off with a fixed model shows up in latency and route cost,
+    not in task accuracy;</li>
+    <li>the fault tolerance inherited from Petals works, but the in-flight session does not
+    migrate (the KV cache is server-side).</li>
+  </ul>
+  <h3>Future work</h3>
+  <ul class="lista">
+    <li><strong>Per-request RTT probes</strong> (or event-driven DHT updates) to react to network
+    changes in seconds, not minutes.</li>
+    <li><strong>Session failover</strong>: re-send the prefix to the new block holder, rebuilding
+    the KV cache — closes the gap found in experiment 4.</li>
+    <li><strong>Multiple-holder replicas</strong> to exercise route detours under degradation.</li>
+    <li><strong>Quantization</strong> (8-bit/NF4) as a third quality axis — requires a CUDA GPU.</li>
+    <li><strong>Continuous Pareto frontier</strong>: more samples per α and a formal comparison
+    against the always-fast and always-accurate baselines.</li>
+  </ul>
+</section>
+
+<section id="references">
+  <p class="eyebrow">8 · References</p>
+  <h2>SBC format</h2>
+  <ol class="refs">
+    <li>BORZUNOV, A.; MAXIMOV, V.; RYABININ, M. et al. Petals: Collaborative Inference and Fine-tuning of Large Models. In: <em>Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL 2023)</em>, 2023.</li>
+    <li>RYABININ, M.; BORZUNOV, A.; GORBUNOV, A. et al. Distributed Deep Learning in Open Collaborations. In: <em>Advances in Neural Information Processing Systems (NeurIPS 2023)</em>, 2023.</li>
+    <li>RYABININ, M.; GUSEV, A. Learning@home: Crowdsourced Training of Large Neural Networks using Decentralized Mixture-of-Experts. In: <em>NeurIPS Workshop on Distributed Machine Learning</em>, 2020.</li>
+    <li>MAYMOUNKOV, P.; MAZIÈRES, D. Kademlia: A Peer-to-peer Information System Based on the XOR Metric. In: <em>IPTPS</em>, 2002.</li>
+    <li>VASWANI, A. et al. Attention Is All You Need. In: <em>NeurIPS</em>, 2017.</li>
+    <li>LE SCAO, T. et al. BLOOM: A 176B-Parameter Open-Access Multilingual Language Model. <em>arXiv:2211.05100</em>, 2022.</li>
+    <li>KWON, W. et al. Efficient Memory Management for Large Language Model Serving with PagedAttention. In: <em>SOSP</em>, 2023.</li>
+    <li>SHENG, Y. et al. FlexGen: High-Throughput Generative Inference on Single GPU. In: <em>ICML</em>, 2023.</li>
+    <li>PAPAMARTZIVANOS, D. et al. LAMBADA (Linguistic Analysis of Multi-word Ambiguities in Discourse) — Evaluation of Language Models on Broad-Context Reasoning. <em>ACL 2016</em>.</li>
+  </ol>
+</section>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>

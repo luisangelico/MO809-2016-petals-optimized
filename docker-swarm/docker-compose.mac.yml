@@ -3,7 +3,7 @@
 # inside Linux containers on Docker Desktop — these run CPU-only despite the M4 Pro host.
 services:
   mac-fast:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     cpus: 4
     mem_limit: 4g
     command: >
@@ -14,11 +14,11 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31339
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31339
     ports: ["31339:31339/tcp"]
-    volumes: ["mac-cache:/cache"]
-    environment: ["HF_HUB_DISABLE_XET=1"]
+    volumes: ["mac-cache:/cache", "/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro"]
+    environment: ["HF_HUB_DISABLE_XET=1", "HF_HOME=/cache/hf", "SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem", "REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem", "CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem"]
 
   mac-medium:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     cpus: 2
     mem_limit: 2g
     command: >
@@ -29,11 +29,11 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31340
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31340
     ports: ["31340:31340/tcp"]
-    volumes: ["mac-cache:/cache"]
-    environment: ["HF_HUB_DISABLE_XET=1"]
+    volumes: ["mac-cache:/cache", "/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro"]
+    environment: ["HF_HUB_DISABLE_XET=1", "HF_HOME=/cache/hf", "SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem", "REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem", "CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem"]
 
   mac-slow:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     cpus: 1
     mem_limit: 1g
     command: >
@@ -44,12 +44,12 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31341
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31341
     ports: ["31341:31341/tcp"]
-    volumes: ["mac-cache:/cache"]
-    environment: ["HF_HUB_DISABLE_XET=1"]
+    volumes: ["mac-cache:/cache", "/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro"]
+    environment: ["HF_HUB_DISABLE_XET=1", "HF_HOME=/cache/hf", "SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem", "REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem", "CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem"]
 
   # bf16 replica overlapping the fast tier — the optimizer's per-block precision choice
   mac-fast-bf16:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     cpus: 4
     mem_limit: 3g
     command: >
@@ -60,12 +60,12 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31346
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31346
     ports: ["31346:31346/tcp"]
-    volumes: ["mac-cache:/cache"]
-    environment: ["HF_HUB_DISABLE_XET=1"]
+    volumes: ["mac-cache:/cache", "/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro"]
+    environment: ["HF_HUB_DISABLE_XET=1", "HF_HOME=/cache/hf", "SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem", "REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem", "CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem"]
 
   # "Accurate" model tier: full bloom-1b7 in bf16 (~3.4 GB weights) on one replica
   mac-1b7:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     cpus: 4
     mem_limit: 6g
     command: >
@@ -76,25 +76,30 @@ services:
       --host_maddrs /ip4/0.0.0.0/tcp/31347
       --announce_maddrs /ip4/${HOST_LAN_IP}/tcp/31347
     ports: ["31347:31347/tcp"]
-    volumes: ["mac-cache:/cache"]
-    environment: ["HF_HUB_DISABLE_XET=1"]
+    volumes: ["mac-cache:/cache", "/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro"]
+    environment: ["HF_HUB_DISABLE_XET=1", "HF_HOME=/cache/hf", "SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem", "REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem", "CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem"]
 
   # Ad-hoc end-to-end test: docker compose --profile client run --rm client
   client:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     profiles: ["client"]
     command: python docker-swarm/client_test.py
     environment:
       - HF_HUB_DISABLE_XET=1
+      - HF_HOME=/cache/hf
+      - SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem
       - FOUNDER_MADDR=${FOUNDER_MADDR}
     volumes:
       - ./client_test.py:/app/docker-swarm/client_test.py:ro
       - mac-cache:/cache
+      - /Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro
 
   # Route-optimizer client: objective-aware generation + CSV instrumentation
   # docker compose -f docker-compose.mac.yml --profile router-client run --rm router-client
   router-client:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:arm64
     profiles: ["router-client"]
     command: >
       python router/run_client.py
@@ -103,9 +108,15 @@ services:
       --csv experiments/router-client.csv
     environment:
       - HF_HUB_DISABLE_XET=1
+      - HF_HOME=/cache/hf
+      - SSL_CERT_FILE=/etc/ssl/certs/corp-bundle.pem
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corp-bundle.pem
       - FOUNDER_MADDR=${FOUNDER_MADDR}
     volumes:
       - mac-cache:/cache
+      - /Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem:/etc/ssl/certs/corp-bundle.pem:ro
+      - ./experiments:/app/experiments
 
 volumes:
   mac-cache:

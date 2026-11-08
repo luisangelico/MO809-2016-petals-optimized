@@ -28,7 +28,7 @@ from hivemind import get_logger
 from petals.client.routing.sequence_manager import MissingBlocksError, RemoteSequenceManager
 from petals.data_structures import RemoteSpanInfo
 
-from router.objectives import Objective, current_objective
+from router.objectives import Objective, current_objective, current_route
 from router.quality import QualityTable
 
 logger = get_logger(__name__)
@@ -73,16 +73,28 @@ class RequestAwareSequenceManager(RemoteSequenceManager):
         objective = current_objective.get() or Objective()
         t0 = time.perf_counter()
 
-        span_sequence = self._make_sequence_objective_aware(
+        span_sequence, latency_s, route_ppl = self._make_sequence_objective_aware(
             start_index, end_index, objective, cache_tokens_needed=cache_tokens_needed
         )
 
-        self.last_decision_time_s = time.perf_counter() - t0
+        decision_time_s = time.perf_counter() - t0
+        self.last_decision_time_s = decision_time_s
         self.last_objective = objective
         self.last_spans = span_sequence
 
         route_repr = " => ".join(f"{s.start}:{s.end} via …{str(s.peer_id)[-6:]}" for s in span_sequence)
         logger.info(f"Route found ({objective}): {route_repr}")
+        # Also expose the decision context-locally so the requesting thread (not the shared
+        # manager state) captures ITS route after generation — the manager is shared across
+        # concurrent requests and its last_spans races under the mixed load.
+        current_route.set(
+            {
+                "spans": span_sequence,
+                "decision_time_s": decision_time_s,
+                "latency_s": latency_s,
+                "ppl": route_ppl,
+            }
+        )
         return span_sequence
 
     # ------------------------------------------------------- objective-aware routing
@@ -94,9 +106,10 @@ class RequestAwareSequenceManager(RemoteSequenceManager):
         objective: Objective,
         *,
         cache_tokens_needed: Optional[int],
-    ) -> List[RemoteSpanInfo]:
+    ) -> Tuple[List[RemoteSpanInfo], float, float]:
+        """Route by objective; returns (spans, predicted latency s, route perplexity)."""
         if start_index == end_index:
-            return []
+            return [], 0.0, float("inf")
 
         # For constrained objectives, start at the preferred end of the trade-off and walk
         # the weight towards the other end until the constraint is satisfied.
@@ -107,12 +120,13 @@ class RequestAwareSequenceManager(RemoteSequenceManager):
             alpha = 0.0  # start with the best latency, trade it away until quality fits
 
         spans: List[RemoteSpanInfo] = []
+        latency_s = route_ppl = float("nan")
         for _ in range(7):  # bounded adjustment loop
             spans, latency_s, route_ppl = self._route_with_alpha(
                 start_index, end_index, alpha, cache_tokens_needed=cache_tokens_needed
             )
             if not spans:
-                return []
+                return [], latency_s, route_ppl
             if objective.latency_budget_s is not None:
                 if latency_s <= objective.latency_budget_s or alpha <= 0.0:
                     break
@@ -123,7 +137,7 @@ class RequestAwareSequenceManager(RemoteSequenceManager):
                 alpha = min(1.0, alpha + (1.0 - alpha) / 2)  # trade latency away until quality fits
             else:
                 break
-        return spans
+        return spans, latency_s, route_ppl
 
     def _route_with_alpha(
         self,

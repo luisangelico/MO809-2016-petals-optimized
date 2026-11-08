@@ -41,6 +41,14 @@ class Objective:
 # Set by OptimizedClient.generate() around each request; read inside make_sequence().
 current_objective: ContextVar[Optional[Objective]] = ContextVar("current_objective", default=None)
 
+# Per-request route decision, written by RequestAwareSequenceManager.make_sequence() at
+# decision time and read back by the same request's thread after generation. Context-local
+# on purpose: the manager itself is shared across concurrent requests, so its `last_spans`
+# is whatever route was rebuilt last — reading it after generation races under the mixed
+# concurrent load (all threads would record the final route). Format:
+#   {"spans": [RemoteSpanInfo], "decision_time_s": float, "latency_s": float, "ppl": float}
+current_route: ContextVar[Optional[dict]] = ContextVar("current_route", default=None)
+
 
 def parse_objective(spec: str) -> Objective:
     """Parse a CLI objective spec into an Objective.

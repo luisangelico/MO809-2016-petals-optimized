@@ -80,7 +80,7 @@ def cmd_mixed(args):
             futures = []
             for i, obj in enumerate(jobs):
                 prompt = args.prompts[i % len(args.prompts)]
-                futures.append(pool.submit(client.generate, prompt, obj, args.max_new, csv_logger, False))
+                futures.append(pool.submit(client.generate, prompt, obj, args.max_new, csv_logger, True))
             for f in futures:
                 f.result()
         client.close()
@@ -94,7 +94,7 @@ def cmd_lambada(args):
 
     import datasets
 
-    lambada = datasets.load_dataset("lambada", "lambada_openai", split="test")
+    lambada = datasets.load_dataset("EleutherAI/lambada_openai", "en", split="test")
     examples = [(ex["text"].rsplit(" ", 1)[0], ex["text"].rsplit(" ", 1)[1]) for ex in lambada.select(range(args.n_examples))]
 
     presets = [(spec if spec.startswith(("alpha=", "latency_", "quality_")) else f"alpha={spec}", parse_objective(spec if spec.startswith(("alpha=", "latency_", "quality_")) else f"alpha={spec}")) for spec in args.alphas]

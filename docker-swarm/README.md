@@ -28,24 +28,24 @@ docker run -d -p 5000:5000 --restart=always --name registry registry:2
 On **T490** (from the repo root, `/Users/luishenriqueangelico/MO809A`):
 ```bash
 docker buildx build --platform linux/amd64 -f docker-swarm/Dockerfile \
-  -t 192.168.2.109:5000/petals-swarm:amd64 . --push
+  -t 192.168.2.109:5001/petals-swarm:amd64 . --push
 ```
 
 On **Mac** (needs the corporate proxy CA as a BuildKit secret):
 ```bash
 export B=/Users/luishenriqueangelico/proxy-fix-bundle/allCAbundle-with-bayer.pem
 docker buildx build --platform linux/arm64 --secret id=cacert,src=$B \
-  -f docker-swarm/Dockerfile -t 192.168.2.109:5000/petals-swarm:arm64 . --push
+  -f docker-swarm/Dockerfile -t 192.168.2.109:5001/petals-swarm:arm64 . --push
 ```
 
 Merge into one multi-arch tag (from T490 or Mac):
 ```bash
-docker manifest create 192.168.2.109:5000/petals-swarm:latest \
-  192.168.2.109:5000/petals-swarm:amd64 192.168.2.109:5000/petals-swarm:arm64
-docker manifest push 192.168.2.109:5000/petals-swarm:latest
+docker manifest create 192.168.2.109:5001/petals-swarm:latest \
+  192.168.2.109:5001/petals-swarm:amd64 192.168.2.109:5001/petals-swarm:arm64
+docker manifest push 192.168.2.109:5001/petals-swarm:latest
 ```
 
-T14 never builds — it only pulls `192.168.2.109:5000/petals-swarm:latest` (resolves to amd64).
+T14 never builds — it only pulls `192.168.2.109:5001/petals-swarm:latest` (resolves to amd64).
 
 ## 2. One-time: trust the insecure registry on Mac + T14
 

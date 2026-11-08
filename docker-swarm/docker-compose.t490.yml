@@ -2,9 +2,10 @@
 # Bring-up order: see docker-swarm/README.md (t490-founder must come up first).
 services:
   t490-founder:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:latest
     cpus: 2
     mem_limit: 2g
+    cap_add: [NET_ADMIN]
     command: >
       python -m petals.cli.run_server bigscience/bloom-560m
       --num_blocks 4 --device cpu --torch_dtype float32
@@ -16,9 +17,10 @@ services:
     environment: ["HF_HUB_DISABLE_XET=1"]
 
   t490-slow:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:latest
     cpus: 1
     mem_limit: 1g
+    cap_add: [NET_ADMIN]
     command: >
       python -m petals.cli.run_server bigscience/bloom-560m
       --num_blocks 1 --device cpu --torch_dtype float32
@@ -32,7 +34,7 @@ services:
 
   # bf16 replica of the same blocks — gives the route optimizer a per-block precision choice
   t490-bf16:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:latest
     cpus: 2
     mem_limit: 2g
     command: >
@@ -48,7 +50,7 @@ services:
 
   # "Accurate" model tier: full bloom-1b7 in bf16 (~3.4 GB weights) on one replica
   t490-1b7:
-    image: 192.168.2.109:5000/petals-swarm:latest
+    image: 192.168.2.109:5001/petals-swarm:latest
     cpus: 4
     mem_limit: 6g
     command: >

@@ -21,8 +21,9 @@ parameterized per objective (α weight, latency SLA, or quality floor). The deci
 hierarchical: (1) per-request model selection (architecture/size), (2) per-block replica
 selection (precision and node).
 
-The full proposal is in [`apresentacao/`](apresentacao/) and the progress report in
-[`relatorio-parcial.txt`](relatorio-parcial.txt) (Portuguese).
+The full proposal is in [`apresentacao/`](apresentacao/), the final report in
+[`RELATORIO.md`](RELATORIO.md) (Portuguese) / [`REPORT.md`](REPORT.md) (English),
+and the project site in [`docs/`](docs/) (GitHub Pages: PT at `index.html`, EN at `en.html`).
 
 ## Heterogeneous swarm (3 axes)
 
