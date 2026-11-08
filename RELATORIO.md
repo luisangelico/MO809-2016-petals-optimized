@@ -46,6 +46,16 @@ requisição, e escolher bem muda tanto a latência quanto a qualidade percebida
 
 ## 2. Background
 
+- **Petals**: plataforma open-source de inferência e fine-tuning *colaborativos* de LLMs de
+  100B+ (BLOOM, Llama, Falcon, Mixtral). Divide um modelo em blocos hospedados por máquinas
+  voluntárias espalhadas pela rede; o cliente conecta ao enxame via DHT e roda a inferência
+  passando ativações pela cadeia de servidores. Expõe uma API drop-in do HuggingFace
+  (`AutoDistributedModelForCausalLM`) — este projeto estende exatamente o roteador que fica por
+  trás dessa API.
+- **Hivemind**: biblioteca PyTorch para deep learning descentralizado (projeto
+  Learning@home): DHT Kademlia sobre libp2p, all-reduce descentralizado, MoE descentralizado e
+  otimizadores tolerantes a falhas. É a base sobre a qual o Petals foi construído: fornece o DHT
+  de descoberta e anúncio de blocos e a rede p2p das RPCs cliente↔servidor.
 - **Inferência distribuída por pipeline paralelo**: um transformer é cortado
   em blocos consecutivos; cada nó hospeda um intervalo de blocos. Gerar um
   token exige percorrer todos os blocos em ordem — a latência por token é a
