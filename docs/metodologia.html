@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Metodologia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/methodology.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a class="on" href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">5 · Metodologia</p>
+<h2>Testbed, métricas e protocolo</h2>
+<h3>Testbed heterogêneo (3 hosts)</h3>
+<div class="tabela"><table>
+  <tr><th>Componente</th><th>Detalhe</th></tr>
+  <tr><td>MacBook M4 Pro (arm64, macOS)</td><td>Servidores via MPS; também roda o cliente das medições</td></tr>
+  <tr><td>Lenovo T490 (x86_64, Ubuntu 24.04, 24 GB)</td><td>Fundador do enxame (DHT, porta 31337), CPU</td></tr>
+  <tr><td>Lenovo T14 (rede corporativa)</td><td>Pior enlace da topologia — alvo dos experimentos 2 e 4</td></tr>
+  <tr><td>Variantes Docker</td><td>12 nós virtuais em 3 hosts</td></tr>
+  <tr><td>Modelos</td><td>bloom-560m + bloom-1b7, 24 blocos cada, réplicas fp32 e bf16</td></tr>
+  <tr><td>Stack</td><td>Petals 2.3.0.dev2 · Hivemind 1.2.0.dev0 (commit fixado) · transformers 4.43.1 · torch (CPU/MPS)</td></tr>
+</table></div>
+<h3>Contêineres por computador (12 nós virtuais)</h3>
+<p>Especificação de cada contêiner (<span class="mono">docker-swarm/docker-compose.*.yml</span>). Dentro dos contêineres
+Linux do Docker Desktop não há MPS — todos os nós virtuais rodam em CPU.</p>
+<div class="tabela"><table>
+  <tr><th>Contêiner</th><th>Host</th><th>Modelo</th><th>Blocos</th><th>vCPU</th><th>RAM</th><th>Precisão</th></tr>
+  <tr><td>mac-fast</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>9</td><td>4</td><td>4 GB</td><td>fp32</td></tr>
+  <tr><td>mac-medium</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32</td></tr>
+  <tr><td>mac-slow</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32</td></tr>
+  <tr><td>mac-fast-bf16</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>9</td><td>4</td><td>3 GB</td><td>bf16</td></tr>
+  <tr><td>mac-1b7</td><td>Mac M4 Pro</td><td>bloom-1b7</td><td>24</td><td>4</td><td>6 GB</td><td>bf16</td></tr>
+  <tr><td>t490-founder</td><td>Lenovo T490</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32 (fundador do DHT)</td></tr>
+  <tr><td>t490-slow</td><td>Lenovo T490</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32</td></tr>
+  <tr><td>t490-bf16</td><td>Lenovo T490</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>bf16</td></tr>
+  <tr><td>t490-1b7</td><td>Lenovo T490</td><td>bloom-1b7</td><td>24</td><td>4</td><td>6 GB</td><td>bf16</td></tr>
+  <tr><td>t14-medium</td><td>Lenovo T14</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32 (alvo de netem/falha, NET_ADMIN)</td></tr>
+  <tr><td>t14-slow</td><td>Lenovo T14</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32 (NET_ADMIN)</td></tr>
+  <tr><td>t14-bf16</td><td>Lenovo T14</td><td>bloom-560m</td><td>2</td><td>2</td><td>2 GB</td><td>bf16</td></tr>
+</table></div>
+<p>Todos os 5 experimentos medidos rodam no <strong>bloom-560m</strong> — o tier bloom-1b7 existe no enxame e na
+seleção de modelo do roteador, mas não é o caminho exercitado nos experimentos. Modelos pequenos o bastante
+para rodar em CPU nos 3 hosts (sem CUDA neste hardware), mantendo o pipeline do Petals (DHT, divisão de blocos,
+KV cache) fiel ao upstream.</p>
+<h3>Dados de teste</h3>
+<div class="tabela"><table>
+  <tr><th>Dado</th><th>O que é</th><th>Onde é usado</th></tr>
+  <tr><td>3 prompts do dia a dia</td><td>"The capital of France is", "Water boils at a temperature of", "The largest planet in the solar system is" — 20 tokens de geração, 5 repetições por nível de α</td><td>Experimentos 1 e 3</td></tr>
+  <tr><td>WikiText-2</td><td>100 documentos de validação, janela deslizante — perplexidade offline por (modelo, precisão) → tabela consultada pelo roteador</td><td>Score de qualidade (proxy)</td></tr>
+  <tr><td>LAMBADA</td><td>50 passagens, exatidão da última palavra</td><td>Experimento 5 (150 requisições, 0 erros)</td></tr>
+  <tr><td>Modelo de referência local</td><td>Cópia fp32 íntegra do bloom-560m no cliente — o "gabarito"</td><td>NLL/token e concordância de tokens</td></tr>
+</table></div>
+<h3>Métricas</h3>
+<p>TTFT (tempo até o primeiro token) · tokens/s · <strong>tempo de decisão do roteador</strong> ·
+composição da rota (spans, precisão, nós) · bytes de ativação por token · NLL por token vs.
+referência fp32 · concordância de tokens · acurácia em tarefa (LAMBADA).</p>
+<h3>Experimentos</h3>
+<div class="tabela"><table>
+  <tr><th>#</th><th>Experimento</th><th>Protocolo</th></tr>
+  <tr><td>1</td><td>Varredura de α</td><td>α = 0 → 1 em 5 passos, mesmos prompts → fronteira de Pareto; vanilla como linha de base</td></tr>
+  <tr><td>2</td><td>Degradação de rede</td><td><span class="mono">tc netem delay 150ms 50ms loss 2%</span> no nó médio do T14; antes/depois com α ∈ {0, 0.5, 1}</td></tr>
+  <tr><td>3</td><td>Carga mista</td><td>8 requisições concorrentes: 4 com α=0 + 4 com α=1, simultâneas</td></tr>
+  <tr><td>4</td><td>Injeção de falha</td><td><span class="mono">docker stop</span> de um nó da rota em plena geração; linha do tempo da recuperação</td></tr>
+  <tr><td>5</td><td>Acurácia (LAMBADA)</td><td>50 passagens × {α=0, α=1, vanilla}; exatidão da última palavra</td></tr>
+</table></div>
+
+<nav class="pagination">
+  <a href="proposta.html"><span>← Anterior</span><b>Proposta</b></a>
+  <a class="proxima" href="resultados.html"><span>Próxima →</span><b>Resultados</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

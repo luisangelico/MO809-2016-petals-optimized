@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Background</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/background.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a class="on" href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">2 · Background</p>
+<h2>Conceitos e fundamentos</h2>
+<ul class="lista">
+  <li><strong>Petals</strong> — plataforma open-source de inferência e fine-tuning
+  <em>colaborativos</em> de LLMs de 100B+ (BLOOM, Llama, Falcon, Mixtral). Divide um modelo em
+  blocos hospedados por máquinas voluntárias espalhadas pela rede; o cliente conecta ao enxame
+  via DHT e roda a inferência passando ativações pela cadeia de servidores. Expõe uma API
+  drop-in do HuggingFace (<span class="mono">AutoDistributedModelForCausalLM</span>) — este
+  projeto estende exatamente o roteador que fica por trás dessa API.</li>
+</ul>
+<figure>
+  <img src="assets/petals-routing.png" alt="Diagrama do Petals: o modelo BLOOM dividido em 3 partes em servidores distintos; cada cliente (French, Hindi, C++ e YOU) percorre uma cadeia própria de blocos">
+  <figcaption>Como o Petals divide um modelo (BLOOM) em blocos hospedados por servidores
+  diferentes: cada cliente percorre uma cadeia própria de blocos — é essa cadeia que o Nectar
+  escolhe por requisição. Fonte do Petals:
+  <a href="https://github.com/bigscience-workshop/petals">github.com/bigscience-workshop/petals</a>.</figcaption>
+</figure>
+<ul class="lista">
+  <li><strong>Hivemind</strong> — biblioteca PyTorch para deep learning descentralizado
+  (projeto Learning@home): DHT Kademlia sobre libp2p, all-reduce descentralizado, MoE
+  descentralizado e otimizadores tolerantes a falhas. É a base sobre a qual o Petals foi
+  construído: fornece o DHT de descoberta e anúncio de blocos e a rede p2p das RPCs
+  cliente↔servidor.</li>
+  <li><strong>Inferência distribuída por pipeline paralelo</strong> — um transformer é cortado em
+  blocos consecutivos; cada nó hospeda um intervalo. Gerar um token exige percorrer todos os
+  blocos em ordem: a latência por token é a soma dos atrasos de todos os saltos da rota.</li>
+  <li><strong>DHT (Distributed Hash Table)</strong> — o Hivemind usa um DHT Kademlia-style
+  (libp2p) para anunciar quais nós hospedam quais blocos e propagar métricas
+  (<span class="mono">ServerInfo</span>: precisão, RPS, cache livre, pings).</li>
+  <li><strong>KV cache</strong> — a memória de atenção da geração vive <em>no servidor</em>; por
+  isso uma sessão em andamento não migra para outro nó em caso de falha.</li>
+  <li><strong>Perplexidade e NLL</strong> — qualidade: perplexidade por (modelo, precisão) medida
+  offline em WikiText-2; divergência do texto gerado vs. referência fp32 local.</li>
+  <li><strong>Fronteira de Pareto</strong> — conjunto de rotas em que melhorar latência só é
+  possível piorando qualidade. O α percorre essa fronteira:
+  <span class="mono">custo = (1 − α)·latência + α·custo_qualidade</span>.</li>
+</ul>
+
+<nav class="pagination">
+  <a href="introducao.html"><span>← Anterior</span><b>Introdução</b></a>
+  <a class="proxima" href="relacionados.html"><span>Próxima →</span><b>Trabalhos Relacionados</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

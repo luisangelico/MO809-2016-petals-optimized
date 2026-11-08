@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Trabalhos Relacionados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/related.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a class="on" href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">3 · Trabalhos Relacionados</p>
+<h2>Soluções semelhantes</h2>
+<div class="tabela"><table>
+  <tr><th>Trabalho</th><th>O que faz</th><th>Diferença para este projeto</th></tr>
+  <tr><td>Petals<br><span style="color:var(--muted)">Borzunov et al., ACL 2023</span></td>
+      <td>Inferência/fine-tuning colaborativo de LLMs de 100B+</td>
+      <td>Roteia apenas por throughput/ping, sem objetivo por requisição — este projeto estende exatamente esse ponto</td></tr>
+  <tr><td>Hivemind / Learning@home<br><span style="color:var(--muted)">Ryabinin et al.</span></td>
+      <td>DHT, all-reduce descentralizado, MoE</td>
+      <td>Fornece a infraestrutura de descoberta e tolerância a falhas reutilizada aqui</td></tr>
+  <tr><td>FlexGen<br><span style="color:var(--muted)">Sheng et al., ICML 2023</span></td>
+      <td>Inferência de alto throughput em 1 GPU</td>
+      <td>Otimiza colocação de tensores num nó; aqui, a otimização é de <em>rota</em> entre nós</td></tr>
+  <tr><td>vLLM / PagedAttention<br><span style="color:var(--muted)">Kwon et al., SOSP 2023</span></td>
+      <td>Gerenciamento de memória KV no servidor</td>
+      <td>Atua no servidor; este projeto atua no cliente, na escolha da rota</td></tr>
+  <tr><td>Dijkstra / Kademlia<br><span style="color:var(--muted)">Maymounkov &amp; Mazières, IPTPS 2002</span></td>
+      <td>Caminhos mínimos; DHT XOR</td>
+      <td>Base algorítmica do roteador e da descoberta de pares</td></tr>
+</table></div>
+<p><strong>Posicionamento (lacuna de pesquisa).</strong> Os sistemas existentes estudam
+separadamente execução descentralizada de LLMs, roteamento de réplicas, escalonamento em
+recursos heterogêneos, roteamento de modelos e precisão adaptativa; nenhum estabelece a política
+combinada proposta aqui: seleção por requisição de uma configuração de execução no Petals
+(variante do modelo, réplica de bloco, precisão e nó) sob um objetivo explícito latência–qualidade,
+considerando comunicação, concorrência, falhas e overhead de roteamento. Na topologia avaliada, o
+escore de qualidade não produziu variação mensurável de qualidade de saída; a análise de Pareto
+reportada deve portanto ser interpretada como um trade-off custo de rota/latência, e não como uma
+fronteira de qualidade de ponta a ponta validada.</p>
+
+<nav class="pagination">
+  <a href="background.html"><span>← Anterior</span><b>Background</b></a>
+  <a class="proxima" href="proposta.html"><span>Próxima →</span><b>Proposta</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

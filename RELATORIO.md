@@ -1,7 +1,7 @@
-# Otimização de Rotas Sensível a Requisições para Inferência Distribuída de LLMs: Seleção Objetivo-Consciente de Réplicas no Lado do Cliente em Petals
+# Nectar: Seleção Objetivo-Consciente de Réplicas para Inferência Distribuída de LLMs em Petals
 
 **Relatório final — MO809A (Unicamp — Tópicos em Computação Distribuída)**
-Projeto: *Optimized Petals* — roteamento consciente do objetivo em enxames Petals.
+Projeto: *Nectar* — roteador objetivo-consciente para enxames Petals.
 
 ---
 
@@ -95,6 +95,8 @@ requisição, e escolher bem muda tanto a latência quanto a qualidade percebida
 
 Um **roteador consciente do objetivo**, hierárquico, no cliente:
 
+![Arquitetura do sistema: 3 hosts, DHT Hivemind, pilha router/ e as 5 decisões por requisição](docs/assets/architecture.png)
+
 1. **Nível 1 — seleção de modelo** (`router/selector.py`): dado o objetivo,
    escolher o tier — `bloom-560m` (rápido) vs `bloom-1b7` (preciso) — pela
    latência prevista + pontuação de qualidade do modelo.
@@ -113,10 +115,29 @@ Um **roteador consciente do objetivo**, hierárquico, no cliente:
    linha de CSV por requisição — TTFT, tokens/s, tempo de decisão, rota,
    bytes de ativação estimados, NLL vs. referência fp32, acurácia de tarefa.
 
+**Escalarização multi-objetivo.** A combinação por soma ponderada
+(`custo = (1 − α)·latência + α·custo_qualidade`) é a forma mais simples de escalarizar um
+objetivo bi-critério e tem interpretação direta como um dial que percorre o espaço de rotas.
+Limitação conhecida da técnica — e assumida aqui: soma ponderada não alcança regiões
+**não convexas** da fronteira de Pareto. Os objetivos restritos (`latency_budget`,
+`quality_floor`) cobrem parcialmente essa lacuna: funcionam como ε-restrição sobre o mesmo
+grafo, caminhando no peso até a rota prevista satisfazer a restrição declarada.
+
 O objetivo viaja por requisição num `ContextVar` (o call stack do Petals não
 expõe um parâmetro de objetivo até `InferenceSession`), e o tratamento de
 falhas do Petals (pares banidos, re-rotação via DHT, `on_request_failure`) é
 herdado intacto.
+
+**Alinhamento com aprendizado distribuído.** O Petals foi construído sobre o Hivemind
+para inferência *e* fine-tuning distribuídos: além da inferência, ele suporta fine-tuning
+distribuído via autograd sequencial pelos mesmos servidores. A extensão aqui apresentada
+vive no roteador, compartilhado pelos dois caminhos — inferência e treino — então o
+roteamento objetivo-consciente se aplica ao fine-tuning distribuído sem mudança. Em relação
+à aprendizagem federada, a diferença estrutural é o particionamento: no FL os clientes têm o
+modelo inteiro e trocam gradientes (paralelismo de dados); no Petals cada nó hospeda uma
+fração do modelo e trocam ativações em cadeia (pipeline) — a heterogeneidade do enxame
+aparece como réplicas em precisão/nó distintos, exatamente o que o roteamento explora.
+
 
 ---
 
@@ -132,6 +153,40 @@ herdado intacto.
 | Variantes Docker | 12 nós virtuais em 3 hosts (`docker-swarm/`) |
 | Modelos | `bloom-560m` + `bloom-1b7`, 24 blocos cada, réplicas fp32 e bf16 |
 | Stack | Petals 2.3.0.dev2 · Hivemind 1.2.0.dev0 (commit fixado) · transformers 4.43.1 · torch (CPU/MPS) |
+
+
+**Contêineres por computador (12 nós virtuais).** Especificação de cada contêiner
+(`docker-swarm/docker-compose.*.yml`). Dentro dos contêineres Linux do Docker Desktop não há
+MPS — todos os nós virtuais rodam em CPU.
+
+| Contêiner | Host | Modelo | Blocos | vCPU | RAM | Precisão |
+|---|---|---|---|---|---|---|
+| mac-fast | Mac M4 Pro | bloom-560m | 9 | 4 | 4 GB | fp32 |
+| mac-medium | Mac M4 Pro | bloom-560m | 4 | 2 | 2 GB | fp32 |
+| mac-slow | Mac M4 Pro | bloom-560m | 1 | 1 | 1 GB | fp32 |
+| mac-fast-bf16 | Mac M4 Pro | bloom-560m | 9 | 4 | 3 GB | bf16 |
+| mac-1b7 | Mac M4 Pro | bloom-1b7 | 24 | 4 | 6 GB | bf16 |
+| t490-founder | T490 | bloom-560m | 4 | 2 | 2 GB | fp32 (fundador do DHT) |
+| t490-slow | T490 | bloom-560m | 1 | 1 | 1 GB | fp32 |
+| t490-bf16 | T490 | bloom-560m | 4 | 2 | 2 GB | bf16 |
+| t490-1b7 | T490 | bloom-1b7 | 24 | 4 | 6 GB | bf16 |
+| t14-medium | T14 | bloom-560m | 4 | 2 | 2 GB | fp32 (alvo de netem/falha, NET_ADMIN) |
+| t14-slow | T14 | bloom-560m | 1 | 1 | 1 GB | fp32 (NET_ADMIN) |
+| t14-bf16 | T14 | bloom-560m | 2 | 2 | 2 GB | bf16 |
+
+Todos os 5 experimentos medidos rodam no `bloom-560m` — o tier `bloom-1b7` existe no enxame e na
+seleção de modelo do roteador, mas não é o caminho exercitado nos experimentos. Modelos pequenos o
+bastante para rodar em CPU nos 3 hosts (sem CUDA neste hardware), mantendo o pipeline do Petals
+(DHT, divisão de blocos, KV cache) fiel ao upstream.
+
+**Dados de teste.**
+
+| Dado | O que é | Onde é usado |
+|---|---|---|
+| 3 prompts do dia a dia | "The capital of France is", "Water boils at a temperature of", "The largest planet in the solar system is" — 20 tokens de geração, 5 repetições por nível de α | Experimentos 1 e 3 |
+| WikiText-2 | 100 documentos de validação, janela deslizante — perplexidade offline por (modelo, precisão) → tabela consultada pelo roteador | Score de qualidade (proxy) |
+| LAMBADA | 50 passagens, exatidão da última palavra | Experimento 5 (150 requisições, 0 erros) |
+| Modelo de referência local | Cópia fp32 íntegra do `bloom-560m` no cliente — o "gabarito" | NLL/token e concordância de tokens |
 
 ### 5.2 Métricas
 
@@ -195,6 +250,8 @@ têm dono único nesta topologia. A latência prevista quase não reagiu
 lento demais para capturar um atraso súbito. É a limitação honesta do modelo de
 custo e aponta para a extensão natural: sondas de RTT por requisição.
 
+![Experimento 2 — TTFT e throughput antes/depois do netem](docs/assets/exp2-netem.png)
+
 ### 6.3 Experimento 3 — Carga mista concorrente
 
 `mixed-20261108-021346.csv` — 8 requisições simultâneas (4 α=0 + 4 α=1):
@@ -204,6 +261,8 @@ custo e aponta para a extensão natural: sondas de RTT por requisição.
 - TTFT por requisição: 0.61–1.60 s; tempo de decisão: 0.2–1.5 ms; **0 erros**.
 - A instrumentação por requisição (ContextVar `current_route`) elimina a
   condição de corrida de leitura do estado compartilhado do gerenciador.
+
+![Experimento 3 — TTFT e tokens/s por requisição sob concorrência](docs/assets/exp3-mixed.png)
 
 ### 6.4 Experimento 4 — Injeção de falha em plena geração
 
@@ -225,6 +284,8 @@ custo e aponta para a extensão natural: sondas de RTT por requisição.
 Aponta diretamente para a extensão natural: reenviar o prefixo ao novo dono do
 bloco no failover.
 
+![Experimento 4 — recuo do cliente e janela de DHT obsoleto](docs/assets/exp4-fault.png)
+
 ### 6.5 Experimento 5 — Acurácia em tarefa real (LAMBADA)
 
 `lambada-20261108-023638.csv` — 50 passagens × 3 cenários, 150 requisições, 0 erros:
@@ -241,6 +302,8 @@ spans fp32 remotos, mas a acurácia é idêntica — mesmo modelo (bloom-560m) e
 decodificação gulosa determinística produzem o mesmo texto em qualquer rota.
 O ganho de qualidade potencial (blocos em precisão total) aparece no custo da
 rota, não no acerto. Overhead de decisão: 0.37–0.44 ms.
+
+![Experimento 5 — acurácia LAMBADA com IC 95% binomial](docs/assets/exp5-lambada.png)
 
 ---
 
@@ -267,7 +330,24 @@ qualidade. As medições mostram:
 - a tolerância a falhas herdada do Petals funciona, mas a sessão em voo não
   migra (KV cache é do servidor).
 
-### 7.2 Trabalhos futuros
+### 7.2 Ameaças à validade
+
+- **Amostras pequenas**: 18 requisições na varredura de α (3 prompts × 5 α + vanilla),
+  50 passagens LAMBADA, 3 requisições por α no netem — sem intervalos de confiança; a
+  varredura é de sanidade da mecânica, não caracterização fina da fronteira.
+- **Topologia única**: um enxame de 3 hosts com blocos de dono único; as conclusões de
+  desvio e reatividade de telemetria dependem da topologia e devem ser reavaliadas em
+  enxames com réplicas sobrepostas.
+- **Qualidade como proxy**: a dimensão qualidade é o escore de roteamento (perplexidade
+  offline); não houve diferença mensurável de qualidade de saída (mesmo modelo,
+  decodificação gulosa determinística).
+- **Telemetria defasada**: a tabela de RTTs do DHT atualiza por ping com janela longa — a
+  latência prevista não capturou o atraso injetado; as conclusões sobre reatividade valem
+  para esse regime de atualização.
+- **Escopo do modelo**: BLOOM-560m/1b7 em CPU/MPS (sem CUDA, sem quantização);
+  comportamento com modelos maiores e aceleradores dedicados não foi medido.
+
+### 7.3 Trabalhos futuros
 
 1. **Sondas de RTT por requisição** (ou atualizações de DHT dirigidas a
    eventos) para reagir a mudanças de rede em segundos, não minutos.

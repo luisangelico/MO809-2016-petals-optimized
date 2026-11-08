@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../resultados.html">PT</a><a class="on" href="results.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a href="related.html">Related Work</a>
+  <a href="proposal.html">Proposal</a><a href="methodology.html">Methodology</a>
+  <a class="on" href="results.html">Results</a><a href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">6 · Results</p>
+<h2>Data and discussion</h2>
+
+<h3>6.1 α sweep (Pareto frontier)</h3>
+<div class="tabela"><table>
+  <tr><th>α</th><th>tok/s</th><th>TTFT (s)</th><th>Decision (ms)</th><th>NLL/tok vs fp32</th><th>Agreement</th></tr>
+  <tr><td>0.00</td><td>4.2 ± 0.0</td><td>1.29</td><td>0.5</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.25</td><td>4.2 ± 0.3</td><td>0.65</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.50</td><td>4.2 ± 0.2</td><td>0.95</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.75</td><td>4.3 ± 0.5</td><td>1.07</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>1.00</td><td>3.9 ± 0.2</td><td>0.75</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>vanilla</td><td>4.4 ± 0.3</td><td>0.50</td><td>—</td><td>—</td><td>—</td></tr>
+</table></div>
+<p>The route changes composition across α: with α=0 the route uses 5 spans on fast local hosts;
+with α=1 the router includes the T14's fp32 span and the predicted perplexity drops
+(22,075 → 22,025) at the cost of lower tok/s. <strong>This is a routing-score difference, not
+observed evidence of better text</strong>: since every route serves the same model, the quality
+dimension shows up in the <em>route cost</em>, not in the generated text. Decision overhead: 0.2–0.6 ms per request (negligible).</p>
+<figure>
+  <img src="../assets/pareto-sweep.png" alt="Throughput and measured quality vs. α (Pareto frontier)">
+  <figcaption>Experiment 1: throughput declines at the quality extreme (4.2 → 3.9 tok/s) and
+  measured NLL stays flat — the same model on every route.</figcaption>
+</figure>
+
+<h3>6.2 Network degradation (netem)</h3>
+<div class="tabela"><table>
+  <tr><th>α</th><th>TTFT before → after</th><th>tok/s before → after</th><th>Predicted latency before → after</th><th>Route changed?</th></tr>
+  <tr><td>0.0</td><td>0.58 → 0.31 s</td><td>4.43 → 4.70</td><td>0.84 → 0.84 s</td>
+      <td class="destaque">No — route doesn't touch the degraded node, zero damage</td></tr>
+  <tr><td>0.5</td><td>0.51 → 1.63 s (+220%)</td><td>3.42 → 1.49 (−56%)</td><td>0.91 → 0.94 s</td><td>No</td></tr>
+  <tr><td>1.0</td><td>0.43 → 1.56 s (+263%)</td><td>2.93 → 1.60 (−45%)</td><td>0.91 → 0.98 s</td><td>No</td></tr>
+</table></div>
+<p>The impact splits exactly along the objective: the latency route (α=0) doesn't use the
+degraded node and takes no damage; the quality routes (α=0.5/1) go straight through it and
+<strong>cannot detour</strong> — the blocks it hosts have single holders in this topology.
+<strong>The failure to detour is a topology constraint, not a router failure</strong>: adaptive
+routing only provides resilience when the swarm exposes genuine alternatives — overlapping block
+replicas with sufficiently current telemetry. The
+predicted latency barely reacted (0.91 → 0.94 s) while actual TTFT tripled: the DHT's
+ping-based RTT table refreshes too slowly to capture a sudden injected delay — the natural
+extension is per-request RTT probes.</p>
+<figure>
+  <img src="../assets/exp2-netem.png" alt="TTFT and throughput before/after netem, per α">
+  <figcaption>Experiment 2: the latency route (α=0) never touches the degraded node and improves; the
+  quality routes (α=0.5/1) go through it — TTFT +220%/+263% and throughput −56%/−45%.</figcaption>
+</figure>
+
+<h3>6.3 Concurrent mixed load</h3>
+<p>8 simultaneous requests (4 α=0 + 4 α=1): routes <strong>differentiated per group at the same
+instant</strong> — α=0 → wide bf16 route (6 spans via mac-fast-bf16); α=1 → 7-span route through
+the T14's fp32 spans. Per-request TTFT 0.61–1.60 s; decision time 0.2–1.5 ms; 0 errors. The
+per-request instrumentation (the <span class="mono">current_route</span> ContextVar) eliminates
+the race of reading the shared manager's state after generation.</p>
+<figure>
+  <img src="../assets/exp3-mixed.png" alt="Per-request TTFT and tok/s, α=0 vs α=1 under concurrency">
+  <figcaption>Experiment 3: per-request TTFT and throughput under 8 simultaneous requests — α=0 and α=1
+  groups routed differently at the same instant, 0 errors.</figcaption>
+</figure>
+
+<h3>6.4 Mid-generation fault injection</h3>
+<ol class="fases">
+  <li><b>Instant detection</b> — the connection error lands in the same second as the
+  <span class="mono">docker stop</span>.</li>
+  <li><b>Stale-DHT window (~5 min)</b> — the DHT keeps advertising the dead node; route rebuilds
+  keep picking it and the client backs off progressively (1 → 2 → 4 → … → 60 s).</li>
+  <li><b>Swarm self-recovery</b> — once the stale record expires, the DHT hands out live
+  replacement replicas and the lost block is covered again.</li>
+  <li><b>The interrupted request cannot migrate</b> — the KV cache lived on the node that died;
+  continuing on a fresh machine fails a length check
+  (<span class="mono">AssertionError('0 and N')</span>) and the request never completes —
+  while every <em>new</em> request works fine on the repaired topology.</li>
+</ol>
+<p>The swarm survives; the in-flight request does not — pointing at the natural extension:
+re-sending the prefix to the new block holder on failover.</p>
+<figure>
+  <img src="../assets/exp4-fault.png" alt="Recovery timeline: retry backoff and stale-DHT window">
+  <figcaption>Experiment 4: the client's progressive backoff (1 → 2 → 4 → … → 60 s) while the DHT still
+  advertises the dead node; once the stale record expires (~4.5 min), routes switch to the live replica —
+  but the in-flight request cannot migrate (lost cache, <span class="mono">AssertionError</span>).</figcaption>
+</figure>
+
+<h3>6.5 Real-task accuracy (LAMBADA)</h3>
+<div class="tabela"><table>
+  <tr><th>Scenario</th><th>Route</th><th>TTFT</th><th>tok/s</th><th>Accuracy</th></tr>
+  <tr><td>Optimizer α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Optimizer α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Vanilla</td><td>—</td><td>0.93 s</td><td>2.57</td><td class="destaque">38/50 = 76%</td></tr>
+</table></div>
+<p>Routing changes <strong>latency, not accuracy</strong>: the quality route (α=1) pays +40%
+TTFT and −24% throughput to traverse the remote fp32 spans, but accuracy is identical — the
+same model with deterministic greedy decoding produces the same text on any route. The potential
+quality gain (full-precision blocks) shows up in route cost, not in exact-match. Decision
+overhead: 0.37–0.44 ms.</p>
+<figure>
+  <img src="../assets/exp5-lambada.png" alt="LAMBADA accuracy per scenario with binomial 95% CI">
+  <figcaption>Experiment 5: 38/50 = 76% in all three scenarios (binomial 95% CI) — routing changes
+  latency, not accuracy.</figcaption>
+</figure>
+
+<nav class="pagination">
+  <a href="methodology.html"><span>← Previous</span><b>Methodology</b></a>
+  <a class="proxima" href="conclusion.html"><span>Next →</span><b>Conclusion</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

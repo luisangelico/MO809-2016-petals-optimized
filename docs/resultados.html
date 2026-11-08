@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Resultados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/results.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a class="on" href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">6 · Resultados</p>
+<h2>Dados obtidos e discussão</h2>
+
+<h3>6.1 Varredura de α (fronteira de Pareto)</h3>
+<div class="tabela"><table>
+  <tr><th>α</th><th>tokens/s</th><th>TTFT (s)</th><th>Decisão (ms)</th><th>NLL/tok vs fp32</th><th>Concordância</th></tr>
+  <tr><td>0.00</td><td>4.2 ± 0.0</td><td>1.29</td><td>0.5</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.25</td><td>4.2 ± 0.3</td><td>0.65</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.50</td><td>4.2 ± 0.2</td><td>0.95</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>0.75</td><td>4.3 ± 0.5</td><td>1.07</td><td>0.4</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>1.00</td><td>3.9 ± 0.2</td><td>0.75</td><td>0.3</td><td>1.133</td><td>1.00</td></tr>
+  <tr><td>vanilla</td><td>4.4 ± 0.3</td><td>0.50</td><td>—</td><td>—</td><td>—</td></tr>
+</table></div>
+<p>A rota muda de composição ao longo do α: com α=0 a rota usa 5 spans em hosts locais rápidos;
+com α=1 o roteador inclui o span fp32 do T14 e a perplexidade prevista cai (22,075 → 22,025) ao
+custo de tokens/s menores. <strong>Isso é uma diferença no escore de roteamento, não evidência
+observada de texto melhor</strong>: como todas as rotas servem o mesmo modelo, a dimensão
+qualidade aparece no <em>custo da rota</em>, não no texto gerado. Overhead de decisão:
+0.2–0.6 ms por requisição (desprezível).</p>
+<figure>
+  <img src="assets/pareto-sweep.png" alt="Throughput e qualidade medidos vs. α (fronteira de Pareto)">
+  <figcaption>Experimento 1: throughput declina no extremo qualidade (4.2 → 3.9 tok/s) e o NLL medido
+  permanece plano — mesmo modelo em todas as rotas.</figcaption>
+</figure>
+
+<h3>6.2 Degradação de rede (netem)</h3>
+<div class="tabela"><table>
+  <tr><th>α</th><th>TTFT antes → depois</th><th>tokens/s antes → depois</th><th>Lat. prevista antes → depois</th><th>Rota mudou?</th></tr>
+  <tr><td>0.0</td><td>0.58 → 0.31 s</td><td>4.43 → 4.70</td><td>0.84 → 0.84 s</td>
+      <td class="destaque">Não — rota não toca o nó degradado, dano zero</td></tr>
+  <tr><td>0.5</td><td>0.51 → 1.63 s (+220%)</td><td>3.42 → 1.49 (−56%)</td><td>0.91 → 0.94 s</td><td>Não</td></tr>
+  <tr><td>1.0</td><td>0.43 → 1.56 s (+263%)</td><td>2.93 → 1.60 (−45%)</td><td>0.91 → 0.98 s</td><td>Não</td></tr>
+</table></div>
+<p>O impacto se divide exatamente ao longo do objetivo: a rota de latência (α=0) não usa o nó
+degradado e não sofre nada; as rotas de qualidade (α=0.5/1) passam por ele e <strong>não podem
+desviar</strong> — os blocos que ele hospeda têm dono único nesta topologia.
+<strong>O não-desvio é uma restrição de topologia, não uma falha do roteador</strong>: roteamento
+adaptativo só entrega resiliência quando o enxame expõe alternativas reais — réplicas sobrepostas
+com telemetria suficientemente atual. A latência prevista
+quase não reagiu (0.91 → 0.94 s) enquanto o TTFT real triplicou: a tabela de RTTs do DHT atualiza
+lento demais para capturar um atraso súbito — a extensão natural são sondas de RTT por requisição.</p>
+<figure>
+  <img src="assets/exp2-netem.png" alt="TTFT e throughput antes/depois do netem, por α">
+  <figcaption>Experimento 2: a rota de latência (α=0) não toca o nó degradado e melhora; as rotas de
+  qualidade (α=0.5/1) passam por ele — TTFT +220%/+263% e throughput −56%/−45%.</figcaption>
+</figure>
+
+<h3>6.3 Carga mista concorrente</h3>
+<p>8 requisições simultâneas (4 α=0 + 4 α=1): rotas <strong>diferenciadas por grupo no mesmo
+instante</strong> — α=0 → rota larga bf16 (6 spans via mac-fast-bf16); α=1 → rota de 7 spans pelos
+spans fp32 do T14. TTFT por requisição 0.61–1.60 s; tempo de decisão 0.2–1.5 ms; 0 erros. A
+instrumentação por requisição (ContextVar <span class="mono">current_route</span>) elimina a
+condição de corrida de leitura do estado compartilhado do gerenciador.</p>
+<figure>
+  <img src="assets/exp3-mixed.png" alt="TTFT e tokens/s por requisição, α=0 vs α=1 sob concorrência">
+  <figcaption>Experimento 3: TTFT e throughput por requisição sob 8 requisições simultâneas — grupos
+  α=0 e α=1 roteados diferentemente no mesmo instante, 0 erros.</figcaption>
+</figure>
+
+<h3>6.4 Injeção de falha em plena geração</h3>
+<ol class="fases">
+  <li><b>Detecção instantânea</b> — o erro de conexão chega no mesmo segundo do <span class="mono">docker stop</span>.</li>
+  <li><b>Janela de DHT obsoleto (~5 min)</b> — o DHT continua anunciando o nó morto; as reconstruções
+  de rota continuam escolhendo-o e o cliente recua progressivamente (1 → 2 → 4 → … → 60 s).</li>
+  <li><b>Autorrecuperação do enxame</b> — expirado o registro obsoleto, o DHT entrega réplicas vivas
+  de substituição e o bloco perdido volta a ser coberto.</li>
+  <li><b>A requisição interrompida não migra</b> — o KV cache vivia no nó que caiu; continuar numa
+  máquina nova falha na checagem de comprimento (<span class="mono">AssertionError('0 and N')</span>)
+  e a requisição nunca completa — enquanto toda requisição <em>nova</em> funciona na topologia reparada.</li>
+</ol>
+<p>O enxame sobrevive; a requisição em voo não — o que aponta para a extensão natural: reenviar o
+prefixo ao novo dono do bloco no failover.</p>
+<figure>
+  <img src="assets/exp4-fault.png" alt="Linha do tempo da recuperação: recuo do retry e janela de DHT obsoleto">
+  <figcaption>Experimento 4: recuo progressivo do cliente (1 → 2 → 4 → … → 60 s) enquanto o DHT anuncia
+  o nó morto; expirado o registro (~4,5 min), as rotas passam a réplica viva — mas a requisição em
+  voo não migra (cache perdido, <span class="mono">AssertionError</span>).</figcaption>
+</figure>
+
+<h3>6.5 Acurácia em tarefa real (LAMBADA)</h3>
+<div class="tabela"><table>
+  <tr><th>Cenário</th><th>Rota</th><th>TTFT</th><th>tokens/s</th><th>Acurácia</th></tr>
+  <tr><td>Otimizador α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Otimizador α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Vanilla</td><td>—</td><td>0.93 s</td><td>2.57</td><td class="destaque">38/50 = 76%</td></tr>
+</table></div>
+<p>O roteamento muda a <strong>latência, não a acurácia</strong>: a rota de qualidade (α=1) paga
++40% de TTFT e −24% de throughput para atravessar os spans fp32 remotos, mas a acurácia é
+idêntica — mesmo modelo e decodificação gulosa determinística produzem o mesmo texto em qualquer
+rota. O ganho de qualidade potencial (blocos em precisão total) aparece no custo da rota, não no
+acerto. Overhead de decisão: 0.37–0.44 ms.</p>
+<figure>
+  <img src="assets/exp5-lambada.png" alt="Acurácia LAMBADA por cenário com IC 95% binomial">
+  <figcaption>Experimento 5: 38/50 = 76% nos três cenários (IC 95% binomial) — o roteamento muda a
+  latência, não a acurácia.</figcaption>
+</figure>
+
+<nav class="pagination">
+  <a href="metodologia.html"><span>← Anterior</span><b>Metodologia</b></a>
+  <a class="proxima" href="conclusao.html"><span>Próxima →</span><b>Conclusão</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Conclusão</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/conclusion.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a class="on" href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">7 · Conclusão</p>
+<h2>Síntese e trabalhos futuros</h2>
+<p>O projeto demonstra que o roteamento do Petals pode ser estendido para <strong>decisões por
+requisição</strong> sem tocar o código upstream: um objetivo declarado (α, orçamento de latência,
+piso de qualidade) seleciona modelo e réplica via um grafo de custo latência–qualidade
+configurável, sem tocar o código upstream. Neste testbed, a política mudou rotas e comportamento
+de latência, <strong>mas não produziu diferenças mensuráveis de qualidade de saída</strong>
+(todas as rotas avaliadas serviram o mesmo modelo e produziram saídas equivalentes sob
+decodificação determinística); a validação de uma fronteira latência–qualidade de ponta a ponta
+fica como trabalho futuro, exigindo alternativas de execução com diferenças observáveis de
+qualidade. As medições mostram:</p>
+<ul class="lista">
+  <li>o overhead da decisão é desprezível (0.2–1.5 ms por requisição);</li>
+  <li>rotas diferenciadas coexistem sob carga concorrente sem degradação mútua;</li>
+  <li>rotas diferenciadas absorvem danos de rede onde o nó degradado não é necessário — e não
+  podem evitá-lo quando ele é o único dono dos blocos;</li>
+  <li>o trade-off latência × qualidade com modelo fixo aparece em latência e custo de rota,
+  não em acurácia de tarefa;</li>
+  <li>a tolerância a falhas herdada do Petals funciona, mas a sessão em voo não migra
+  (o KV cache é do servidor).</li>
+</ul>
+<h3>Trabalhos futuros</h3>
+<ul class="lista">
+  <li><strong>Sondas de RTT por requisição</strong> (ou atualizações de DHT dirigidas a eventos)
+  para reagir a mudanças de rede em segundos, não minutos.</li>
+  <li><strong>Failover de sessão</strong>: reenviar o prefixo ao novo dono do bloco, reconstruindo
+  o KV cache — fecha a lacuna do experimento 4.</li>
+  <li><strong>Réplicas com donos múltiplos</strong> para exercitar o desvio de rota sob degradação.</li>
+  <li><strong>Quantização</strong> (8-bit/NF4) como terceiro eixo de qualidade — exige GPU CUDA.</li>
+  <li><strong>Validação de uma fronteira latência–qualidade de ponta a ponta</strong>: exige
+  alternativas de execução com diferenças observáveis de qualidade (réplicas com donos múltiplos,
+  variantes de modelos de qualidade distinta) selecionadas por requisição — mais amostras por α e
+  comparação formal contra as baselines sempre-rápido e sempre-preciso.</li>
+</ul>
+
+<nav class="pagination">
+  <a href="resultados.html"><span>← Anterior</span><b>Resultados</b></a>
+  <a class="proxima" href="referencias.html"><span>Próxima →</span><b>Referências</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

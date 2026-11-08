@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Methodology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../metodologia.html">PT</a><a class="on" href="methodology.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a href="related.html">Related Work</a>
+  <a href="proposal.html">Proposal</a><a class="on" href="methodology.html">Methodology</a>
+  <a href="results.html">Results</a><a href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">5 · Methodology</p>
+<h2>Testbed, metrics and protocol</h2>
+<h3>Heterogeneous testbed (3 hosts)</h3>
+<div class="tabela"><table>
+  <tr><th>Component</th><th>Detail</th></tr>
+  <tr><td>MacBook M4 Pro (arm64, macOS)</td><td>Servers via MPS; also runs the measurement client</td></tr>
+  <tr><td>Lenovo T490 (x86_64, Ubuntu 24.04, 24 GB)</td><td>Swarm founder (DHT, port 31337), CPU</td></tr>
+  <tr><td>Lenovo T14 (corporate network)</td><td>Worst link in the topology — target of experiments 2 and 4</td></tr>
+  <tr><td>Docker variant</td><td>12 virtual nodes across 3 hosts</td></tr>
+  <tr><td>Models</td><td>bloom-560m + bloom-1b7, 24 blocks each, fp32 and bf16 replicas</td></tr>
+  <tr><td>Stack</td><td>Petals 2.3.0.dev2 · Hivemind 1.2.0.dev0 (pinned commit) · transformers 4.43.1 · torch (CPU/MPS)</td></tr>
+</table></div>
+<h3>Containers per computer (12 virtual nodes)</h3>
+<p>Spec of each container (<span class="mono">docker-swarm/docker-compose.*.yml</span>). Linux containers inside Docker
+Desktop have no MPS — all virtual nodes run on CPU.</p>
+<div class="tabela"><table>
+  <tr><th>Container</th><th>Host</th><th>Model</th><th>Blocks</th><th>vCPU</th><th>RAM</th><th>Precision</th></tr>
+  <tr><td>mac-fast</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>9</td><td>4</td><td>4 GB</td><td>fp32</td></tr>
+  <tr><td>mac-medium</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32</td></tr>
+  <tr><td>mac-slow</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32</td></tr>
+  <tr><td>mac-fast-bf16</td><td>Mac M4 Pro</td><td>bloom-560m</td><td>9</td><td>4</td><td>3 GB</td><td>bf16</td></tr>
+  <tr><td>mac-1b7</td><td>Mac M4 Pro</td><td>bloom-1b7</td><td>24</td><td>4</td><td>6 GB</td><td>bf16</td></tr>
+  <tr><td>t490-founder</td><td>Lenovo T490</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32 (DHT founder)</td></tr>
+  <tr><td>t490-slow</td><td>Lenovo T490</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32</td></tr>
+  <tr><td>t490-bf16</td><td>Lenovo T490</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>bf16</td></tr>
+  <tr><td>t490-1b7</td><td>Lenovo T490</td><td>bloom-1b7</td><td>24</td><td>4</td><td>6 GB</td><td>bf16</td></tr>
+  <tr><td>t14-medium</td><td>Lenovo T14</td><td>bloom-560m</td><td>4</td><td>2</td><td>2 GB</td><td>fp32 (netem/fault target, NET_ADMIN)</td></tr>
+  <tr><td>t14-slow</td><td>Lenovo T14</td><td>bloom-560m</td><td>1</td><td>1</td><td>1 GB</td><td>fp32 (NET_ADMIN)</td></tr>
+  <tr><td>t14-bf16</td><td>Lenovo T14</td><td>bloom-560m</td><td>2</td><td>2</td><td>2 GB</td><td>bf16</td></tr>
+</table></div>
+<p>All 5 measured experiments run on <strong>bloom-560m</strong> — the bloom-1b7 tier exists in the swarm and in
+the router's model-selection level, but is not the exercised path in the experiments. The models are small enough
+to run CPU-only on the 3 hosts (no CUDA on this hardware), keeping the Petals pipeline (DHT, block splits,
+KV cache) faithful to upstream.</p>
+<h3>Test data</h3>
+<div class="tabela"><table>
+  <tr><th>Data</th><th>What it is</th><th>Where it's used</th></tr>
+  <tr><td>3 everyday prompts</td><td>"The capital of France is", "Water boils at a temperature of", "The largest planet in the solar system is" — 20 generated tokens, 5 repetitions per α level</td><td>Experiments 1 and 3</td></tr>
+  <tr><td>WikiText-2</td><td>100 validation documents, sliding window — offline perplexity per (model, precision) → lookup table consulted by the router</td><td>Quality score (proxy)</td></tr>
+  <tr><td>LAMBADA</td><td>50 passages, exact-match on the last word</td><td>Experiment 5 (150 requests, 0 errors)</td></tr>
+  <tr><td>Local reference model</td><td>Pristine fp32 copy of bloom-560m kept on the client — the "answer key"</td><td>NLL/token and token agreement</td></tr>
+</table></div>
+<h3>Metrics</h3>
+<p>TTFT (time to first token) · tok/s · <strong>router decision time</strong> · route composition
+(spans, precision, nodes) · activation bytes per token · NLL per token vs fp32 reference ·
+token agreement · task accuracy (LAMBADA).</p>
+<h3>Experiments</h3>
+<div class="tabela"><table>
+  <tr><th>#</th><th>Experiment</th><th>Protocol</th></tr>
+  <tr><td>1</td><td>α sweep</td><td>α = 0 → 1 in 5 steps, same prompts → Pareto frontier; vanilla baseline</td></tr>
+  <tr><td>2</td><td>Network degradation</td><td><span class="mono">tc netem delay 150ms 50ms loss 2%</span> on the T14's medium node; before/after with α ∈ {0, 0.5, 1}</td></tr>
+  <tr><td>3</td><td>Mixed load</td><td>8 concurrent requests: 4 with α=0 + 4 with α=1, simultaneous</td></tr>
+  <tr><td>4</td><td>Fault injection</td><td><span class="mono">docker stop</span> of a route node mid-generation; recovery timeline</td></tr>
+  <tr><td>5</td><td>Accuracy (LAMBADA)</td><td>50 passages × {α=0, α=1, vanilla}; exact-match on the last word</td></tr>
+</table></div>
+
+<nav class="pagination">
+  <a href="proposal.html"><span>← Previous</span><b>Proposal</b></a>
+  <a class="proxima" href="results.html"><span>Next →</span><b>Results</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

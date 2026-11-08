@@ -1,4 +1,4 @@
-# Architecture — Optimized Petals: request-aware route optimization for distributed LLM inference
+# Architecture — Nectar: objective-aware replica selection for distributed LLM inference in Petals
 
 This document describes the hardware testbed and the software architecture developed for
 the MO809A final project. The system extends Petals' client-side routing so that

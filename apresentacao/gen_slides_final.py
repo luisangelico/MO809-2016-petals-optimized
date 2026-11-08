@@ -145,14 +145,14 @@ tf = cx.text_frame
 tf.word_wrap = True
 p = tf.paragraphs[0]
 r = p.add_run()
-r.text = "Otimizador de Rotas Ciente da Requisição para Inferência Distribuída de LLMs"
+r.text = "Nectar: Seleção Objetivo-Consciente de Réplicas no Petals"
 r.font.size = Pt(36)
 r.font.bold = True
 r.font.color.rgb = BRANCO
 p2 = tf.add_paragraph()
 p2.space_before = Pt(14)
 r2 = p2.add_run()
-r2.text = "Reprodução e extensão do Petals em rede doméstica heterogênea"
+r2.text = "Inferência distribuída de LLMs — extensão do Petals em rede doméstica heterogênea"
 r2.font.size = Pt(22)
 r2.font.color.rgb = AZUL_CLARO
 p3 = tf.add_paragraph()
@@ -175,7 +175,7 @@ slide_conteudo(
         (1, "Executar LLMs em hardware doméstico é viável (estudo de caso real: Mac + 2 notebooks em LAN), mas exige decidir bem para onde mandar cada ativação."),
         (0, "Objetivo"),
         (1, "Estender o cliente do Petals com um roteador ciente da requisição: cada pedido declara um objetivo (α: latência ↔ qualidade) e a rota é otimizada para ele."),
-        (1, "Avaliar a fronteira de Pareto (latência × qualidade) contra o roteamento padrão e linhas de base."),
+        (1, "Avaliar a seleção de rota por requisição (latência e um proxy de qualidade) contra o roteamento padrão e linhas de base."),
     ],
 )
 
@@ -207,7 +207,7 @@ slide_conteudo(
         (0, "Roteamento em sistemas distribuídos"),
         (1, "Kademlia (Maymounkov & Mazières, 2002) — DHT por proximidade de ID; Petals reusa a ideia para localizar blocos."),
         (0, "Diferencial deste trabalho"),
-        (1, "Decisão por requisição (não por sistema), objetivo declarado pelo cliente, e avaliação em fronteira de Pareto com hardware doméstico real."),
+        (1, "Decisão por requisição (não por sistema), objetivo declarado pelo cliente, e avaliação da seleção de rota (latência e proxy de qualidade) com hardware doméstico real."),
     ],
 )
 
@@ -219,6 +219,7 @@ slide_conteudo(
         (0, "Decisão hierárquica em 2 níveis"),
         (1, "Nível 1 — seleção de modelo: bloom-560m (rápido) vs bloom-1b7 (preciso), por α normalizado ou por restrição (orçamento de latência / piso de qualidade)."),
         (1, "Nível 2 — seleção de blocos/réplicas: grafo de inferência com arestas (nó, blocos, precisão) e pesos de latência e qualidade separados; custo = (1−α)·latência + α·qualidade; caminho mínimo (Dijkstra)."),
+        (1, "Escalarização multi-objetivo: soma ponderada é um dial; limitação conhecida — não alcança regiões não-convexas da fronteira. Objetivos restritos (orçamento de latência / piso de qualidade) atuam como ε-restrição sobre o mesmo grafo."),
         (0, "Objetivo via ContextVar — atravessa a pilha do Petals (InferenceSession não tem parâmetro de objetivo)."),
         (0, "Modelo de qualidade"),
         (1, "Tabela de perplexidade por (modelo, precisão), medida em WikiText-2; avaliação online: NLL do texto gerado vs referência fp32 local, concordância de tokens, acurácia LAMBADA."),
@@ -235,7 +236,7 @@ slide_conteudo(
         (1, "bloom-560m em 24 blocos, réplicas em fp32 e bf16 em hosts diferentes; bloom-1b7 como camada precisa."),
         (0, "Métricas por requisição (CSV): TTFT, tok/s, overhead de decisão, rota composta, bytes de ativação/token, NLL vs fp32, acurácia."),
         (0, "Experimentos"),
-        (1, "1. Varredura de α (0→1) — fronteira de Pareto vs linhas de base (padrão Petals, sempre-rápido, sempre-preciso, aleatório)."),
+        (1, "1. Varredura de α (0→1) — custo de rota vs linhas de base (padrão Petals, sempre-rápido, sempre-preciso, aleatório)."),
         (1, "2. Degradação de rede (tc netem: atraso + perda) — sensibilidade da decisão."),
         (1, "3. Carga mista concorrente (requisições de latência e de qualidade ao mesmo tempo)."),
         (1, "4. Injeção de falha em plena geração (derrubar nó da rota) — re-roteamento pela DHT."),
@@ -245,7 +246,7 @@ slide_conteudo(
 
 # ---------------------------------------------------------------- Resultados 1
 slide_tabela(
-    "Resultados 1/3 — Varredura de α (fronteira de Pareto)",
+    "Resultados 1/3 — Varredura de α (custo de rota)",
     ["α", "spans", "tok/s", "TTFT (s)", "ppl prevista", "bytes/token"],
     R_EXP1,
     nota="α=0 (só latência): rota de 5 spans, tudo em hosts locais rápidos. α=1 (só qualidade): roteador inclui span fp32 do T14 — perplexidade cai (22,075 → 22,025) ao custo de tok/s menor e mais bytes de ativação. Overhead de decisão: 0,2–0,6 ms (desprezível).",
@@ -288,8 +289,9 @@ slide_conteudo(
         (1, "Roteador ciente da requisição em 2 níveis (modelo, depois blocos/réplicas/precisão/nó) com objetivo declarado por requisição."),
         (1, "Modelo de qualidade medido (perplexidade por modelo/precisão) integrado ao custo de roteamento."),
         (1, "Instrumentação por requisição + 5 experimentos executados em hardware heterogêneo."),
+        (1, "Alinhamento com aprendizado distribuído: o mesmo roteador atende inferência e fine-tuning distribuído do Petals (autograd sequencial); no FL trocam-se gradientes (paralelismo de dados), no Petals trocam-se ativações em cadeia (pipeline)."),
         (0, "Resultados principais"),
-        (1, "A fronteira de Pareto existe e é navegável: α=1 melhora a qualidade (ppl 22,075 → 22,025) com custo de tok/s mensurável; overhead de decisão ~0,5 ms."),
+        (1, "A rota muda com α: α=1 inclui o span fp32 do T14 (ppl prevista 22,075 → 22,025) ao custo de tok/s; qualidade é proxy — saídas equivalentes (mesmo modelo); overhead ~0,5 ms."),
         (1, "Falhas: detecção instantânea e re-cobertura automática do span, mas sessões em voo não migram (KV cache no servidor)."),
         (0, "Trabalho futuro"),
         (1, "Reenvio de prefixo no failover; medição de qualidade online no roteador; testbed com GPU."),

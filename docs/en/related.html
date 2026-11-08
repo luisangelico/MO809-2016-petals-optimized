@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Related Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../relacionados.html">PT</a><a class="on" href="related.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a class="on" href="related.html">Related Work</a>
+  <a href="proposal.html">Proposal</a><a href="methodology.html">Methodology</a>
+  <a href="results.html">Results</a><a href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">3 · Related Work</p>
+<h2>Comparable solutions</h2>
+<div class="tabela"><table>
+  <tr><th>Work</th><th>What it does</th><th>Difference to this project</th></tr>
+  <tr><td>Petals<br><span style="color:var(--muted)">Borzunov et al., ACL 2023</span></td>
+      <td>Collaborative inference/fine-tuning of 100B+ LLMs</td>
+      <td>Routes only by throughput/ping, with no per-request objective — this project extends exactly that point</td></tr>
+  <tr><td>Hivemind / Learning@home<br><span style="color:var(--muted)">Ryabinin et al.</span></td>
+      <td>DHT, decentralized all-reduce, decentralized MoE</td>
+      <td>Provides the discovery and fault-tolerance infrastructure reused here</td></tr>
+  <tr><td>FlexGen<br><span style="color:var(--muted)">Sheng et al., ICML 2023</span></td>
+      <td>High-throughput inference on 1 GPU</td>
+      <td>Optimizes tensor placement on one node; here, the optimization is the <em>route</em> across nodes</td></tr>
+  <tr><td>vLLM / PagedAttention<br><span style="color:var(--muted)">Kwon et al., SOSP 2023</span></td>
+      <td>Server-side KV memory management</td>
+      <td>Acts on the server; this project acts on the client, choosing the route</td></tr>
+  <tr><td>Dijkstra / Kademlia<br><span style="color:var(--muted)">Maymounkov &amp; Mazières, IPTPS 2002</span></td>
+      <td>Shortest paths; XOR DHT</td>
+      <td>Algorithmic basis of the router and peer discovery</td></tr>
+</table></div>
+<p><strong>Positioning (research gap).</strong> Existing systems separately study decentralized
+LLM execution, replica routing, heterogeneous-resource scheduling, model routing, and adaptive
+precision; none establishes the combined policy proposed here: per-request selection of a Petals
+execution configuration (model variant, block replica, precision, and node) under an explicit
+latency-versus-quality objective, accounting for communication, concurrency, failures, and
+routing overhead. In the evaluated topology, quality-aware scoring did not produce measurable
+output-quality variation; the reported Pareto analysis should therefore be interpreted as a
+route-cost/latency trade-off rather than a validated end-to-end quality frontier.</p>
+
+<nav class="pagination">
+  <a href="background.html"><span>← Previous</span><b>Background</b></a>
+  <a class="proxima" href="proposal.html"><span>Next →</span><b>Proposal</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

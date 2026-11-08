@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Proposta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/proposal.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a class="on" href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">4 · Proposta</p>
+<h2>Roteador consciente do objetivo</h2>
+<p>Cada requisição declara um objetivo; o roteador converte esse objetivo em pesos no grafo de
+blocos do Petals e resolve o menor caminho — <strong>sem mudar nada no servidor</strong>. O fluxo,
+passo a passo:</p>
+<figure>
+  <img src="assets/architecture.png" alt="Arquitetura do sistema: 3 hosts com contêineres, DHT Hivemind, pacote router/ e as 5 decisões por requisição">
+  <figcaption>Arquitetura do sistema: os 3 hosts (Mac M4 Pro, T490, T14) com seus contêineres, o DHT
+  Hivemind/libp2p como quadro de avisos, a pilha router/ → Petals → Hivemind e, à direita, as 5
+  decisões por requisição (objetivo → seleção de modelo → spans candidatos → Dijkstra → geração).</figcaption>
+</figure>
+<ol class="fases">
+  <li><b>Objetivo declarado por requisição</b> — o chamador define α (0 = só latência,
+  1 = só qualidade), um orçamento de latência ou um piso de qualidade; o objetivo viaja num
+  <span class="mono">ContextVar</span> (<span class="mono">current_objective</span>), então
+  requisições concorrentes podem ter objetivos diferentes no mesmo instante.</li>
+  <li><b>Seleção de modelo (nível 1)</b> (<span class="mono">router/selector.py</span>) —
+  dado o objetivo, escolher o tier: <span class="mono">bloom-560m</span> (rápido) vs
+  <span class="mono">bloom-1b7</span> (preciso), pela latência prevista + pontuação de qualidade.</li>
+  <li><b>Grafo de blocos com pesos duplos (nível 2)</b> (<span class="mono">router/policy.py</span>)
+  — <span class="mono">RequestAwareSequenceManager</span> subclasseia o gerenciador do Petals e
+  espelha seu grafo de Dijkstra (RTT cliente→servidor, arestas de saída forçadas, arestas por
+  bloco), mas guarda <em>latência</em> e <em>qualidade</em> como pesos separados. A qualidade de um
+  span = perplexidade média (modelo, precisão) da tabela offline WikiText-2, convertida para
+  segundos equivalentes (<span class="mono">quality_scale_s</span>) para compartilhar unidade com
+  a latência.</li>
+  <li><b>Menor caminho combinado</b> — Dijkstra resolve
+  <span class="mono">custo = (1 − α)·latência + α·custo_qualidade</span> aresta a aresta; o
+  caminho resultante é decomposto em spans (blocos consecutivos no mesmo par).</li>
+  <li><b>Objetivos com restrição caminham no dial</b> — orçamento de latência: começa em α=1
+  (melhor qualidade) e divide α por 2 até a latência prevista caber (máx. 7 passos); piso de
+  qualidade: começa em α=0 (melhor latência) e caminha α para cima até a perplexidade prevista
+  caber — uma busca binária no dial latência↔qualidade.</li>
+</ol>
+<div class="tabela"><table>
+  <tr><th>Objetivo</th><th>Comportamento do roteador</th></tr>
+  <tr><td>α puro (0–1)</td><td>um Dijkstra com o peso fixo — o dial latência↔qualidade</td></tr>
+  <tr><td>Orçamento de latência (SLA)</td><td>melhor qualidade possível que ainda respeita o SLA — caminha α para baixo</td></tr>
+  <tr><td>Piso de qualidade</td><td>latência mais baixa possível que ainda respeita o piso — caminha α para cima</td></tr>
+</table></div>
+<p>O nível 1 do roteador aceita três formas de objetivo declarado: α direto,
+<span class="mono">latency_budget</span> (SLA de TTFT) ou <span class="mono">quality_floor</span>.
+Na prática, o tipo de requisição define: chat/autocomplete → α≈0 ou SLA; sumarização/raciocínio →
+α alto. É a mesma lógica de personalização de um sistema de re-rotação: <strong>o objetivo
+pertence ao cliente, não ao sistema</strong>.</p>
+<p>A <strong>tabela de qualidade</strong> (<span class="mono">router/quality.py</span>) guarda a
+perplexidade por (modelo, precisão) medida offline em WikiText-2; a precisão de cada réplica já
+vem anunciada no DHT, então réplicas fp32/bf16 ficam visíveis no cliente <em>sem nenhuma mudança
+no servidor</em>. O objetivo viaja por requisição num <span class="mono">ContextVar</span>, e o
+tratamento de falhas do Petals (pares banidos, re-rotação via DHT) é herdado intacto. Cada
+requisição gera uma linha de CSV: TTFT, tokens/s, tempo de decisão, rota, bytes de ativação
+estimados, NLL vs. referência fp32 e acurácia de tarefa.</p>
+
+<nav class="pagination">
+  <a href="relacionados.html"><span>← Anterior</span><b>Trabalhos Relacionados</b></a>
+  <a class="proxima" href="metodologia.html"><span>Próxima →</span><b>Metodologia</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

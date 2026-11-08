@@ -1,4 +1,4 @@
-# MO809-2016 — Optimized Petals: request-aware route optimization for distributed LLM inference
+# Nectar — Objective-aware replica selection for distributed LLM inference in Petals (MO809-2016)
 
 Final project for **MO809A** (Unicamp — Topics in Distributed Computing): a
 **request-aware route optimizer** on top of [Petals](https://github.com/bigscience-workshop/petals)
@@ -90,7 +90,7 @@ python router/run_client.py --initial_peers /ip4/<FOUNDER_LAN_IP>/tcp/31337 \
 ```
 
 Objectives: `alpha=<0..1>` | `latency_budget=<seconds>` | `quality_floor=<ppl>ppl`.
-Baselines and the Pareto sweep:
+Baselines and the α sweep:
 
 ```bash
 python router/bench.py --initial_peers ... sweep --alphas 0 0.25 0.5 0.75 1 --baselines
@@ -114,8 +114,8 @@ route composition), and optimizer overhead (route-decision time vs inference tim
 
 **Experiments:**
 
-1. **Speed vs quality trade-off** — Pareto frontier sweeping the objective (α = 0 … 1),
-   vs the baselines.
+1. **Speed vs quality trade-off** — α sweep over the route cost (latency and the
+   quality proxy), vs the baselines.
 2. **Adaptation to network/node degradation** — heterogeneity and stragglers via
    `tc netem` (T490 + T14 containers) / Network Link Conditioner (Mac).
 3. **Mixed concurrent loads** — simultaneous latency-sensitive and quality-sensitive requests.

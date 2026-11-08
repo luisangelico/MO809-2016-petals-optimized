@@ -1,8 +1,12 @@
-"""Request-aware route optimizer for Petals (MO809A final project).
+"""Nectar — request-aware route optimizer for Petals (MO809A final project).
 
 Extends Petals' client-side routing (`RemoteSequenceManager`) to decide, per
 request, which model tier and which block replicas/servers to use based on a
 declared objective (latency-sensitive vs quality-sensitive).
+
+Named for the waggle-dance metaphor: Nectar reads DHT telemetry (the waggle)
+to pick, per request, the nearest bloom (latency) or the richest nectar
+(quality).
 """
 
 from router.objectives import Objective, current_objective, parse_objective

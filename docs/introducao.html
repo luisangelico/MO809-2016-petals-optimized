@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Introdução</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a class="on" href="index.html">PT</a><a href="en/introduction.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Início</a><a class="on" href="introducao.html">Introdução</a>
+  <a href="background.html">Background</a><a href="relacionados.html">Trabalhos Relacionados</a>
+  <a href="proposta.html">Proposta</a><a href="metodologia.html">Metodologia</a>
+  <a href="resultados.html">Resultados</a><a href="conclusao.html">Conclusão</a>
+  <a href="referencias.html">Referências</a><a href="sobre.html">Sobre</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">1 · Introdução</p>
+<h2>O problema</h2>
+<p>Modelos de linguagem de grande porte não cabem em uma única máquina: o Petals divide um
+transformer em blocos hospedados em computadores diferentes, e uma requisição atravessa essa
+"esteira" de nós em sequência. O roteador padrão (<span class="mono">RemoteSequenceManager</span>)
+escolhe os servidores otimizando apenas <em>throughput e ping</em> — toda requisição é roteada
+da mesma forma.</p>
+<p>Isso ignora que requisições são diferentes: tráfego interativo (chat, autocompletar) exige
+<strong>baixa latência</strong>; sumarização e raciocínio <strong>toleram mais latência em troca
+de maior qualidade</strong>. Entre esses extremos existe um espectro inteiro de objetivos
+intermediários.</p>
+<h3>Motivação</h3>
+<p>O enxame caseiro é heterogêneo por natureza: hardware distinto (GPU Apple Silicon vs. CPUs
+x86), precisões distintas (fp32 vs. bf16) e enlaces de qualidade muito diferente (LAN doméstica
+vs. rede corporativa). Essa heterogeneidade — normalmente tratada como limitação — é o que torna
+o roteamento por requisição <em>útil</em>: há escolhas reais a fazer a cada requisição, e escolher
+bem muda latência e qualidade.</p>
+<h3>Objetivos</h3>
+<ul class="lista">
+  <li>Estender o roteamento do cliente do Petals para decidir <em>por requisição</em> quais
+  nós/réplicas usar, a partir de um objetivo declarado (α ∈ [0, 1], orçamento de latência,
+  piso de qualidade).</li>
+  <li>Manter o checkout upstream do Petals intacto — a extensão vive num pacote separado
+  (<span class="mono">router/</span>) que subclasseia <span class="mono">RemoteSequenceManager</span>.</li>
+  <li>Avaliar a seleção de rota por requisição sobre latência e um <em>proxy</em> de qualidade (o escore de roteamento); verificar se diferenças do proxy produzem diferenças mensuráveis de qualidade de saída.</li>
+  <li>Medir robustez: degradação de rede, carga mista concorrente, falha de nó em plena geração
+  e acurácia em tarefa real (LAMBADA).</li>
+</ul>
+
+<nav class="pagination">
+  <a href="index.html"><span>← Anterior</span><b>Início</b></a>
+  <a class="proxima" href="background.html"><span>Próxima →</span><b>Background</b></a>
+</nav>
+
+<footer>
+  <p>Código, CSVs brutos e o roteador completo no
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">repositório do projeto</a> ·
+  Relatórios completos: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

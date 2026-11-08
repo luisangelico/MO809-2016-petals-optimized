@@ -1,7 +1,7 @@
-# Request-Aware Route Optimization for Distributed LLM Inference: Client-Side Objective-Aware Replica Selection in Petals
+# Nectar: Objective-Aware Replica Selection for Distributed LLM Inference in Petals
 
 **Final report — MO809A (Unicamp — Topics in Distributed Computing)**
-Project: *Optimized Petals* — objective-aware routing in Petals swarms.
+Project: *Nectar* — an objective-aware router for Petals swarms.
 (Also available in [Portuguese — `RELATORIO.md`](RELATORIO.md).)
 
 ---
@@ -96,6 +96,8 @@ changes both latency and perceived quality.
 
 An **objective-aware router**, hierarchical, on the client:
 
+![System architecture: 3 hosts, Hivemind DHT, router/ stack and the 5 per-request decisions](docs/assets/architecture.png)
+
 1. **Level 1 — model selection** (`router/selector.py`): given the objective,
    pick the tier — `bloom-560m` (fast) vs `bloom-1b7` (accurate) — by
    predicted latency + model quality score.
@@ -114,10 +116,29 @@ An **objective-aware router**, hierarchical, on the client:
    CSV row per request — TTFT, tok/s, decision time, route, estimated
    activation bytes, NLL vs fp32 reference, task accuracy.
 
+**Multi-objective scalarization.** The weighted-sum combination
+(`cost = (1 − α)·latency + α·quality_cost`) is the simplest way to scalarize a bi-criteria
+objective and reads directly as a dial across the route space. A known limitation of the
+technique — accepted here: weighted sums cannot reach **non-convex** regions of the Pareto
+frontier. The constrained objectives (`latency_budget`, `quality_floor`) partially cover
+this gap: they act as ε-constraints over the same graph, walking the weight until the
+predicted route satisfies the declared constraint.
+
 The objective travels per request in a `ContextVar` (Petals' call stack does
 not expose an objective parameter up to `InferenceSession`), and Petals'
 failure handling (banned peers, DHT rerouting, `on_request_failure`) is
 inherited unchanged.
+
+**Alignment with distributed learning.** Petals was built on Hivemind for distributed
+inference *and* fine-tuning: beyond inference, it supports distributed fine-tuning via
+sequential autograd across the same servers. The extension presented here lives in the
+router, shared by both paths — inference and training — so objective-aware routing applies
+to distributed fine-tuning unchanged. Relative to federated learning, the structural
+difference is the partitioning: in FL clients hold the full model and exchange gradients
+(data parallelism); in Petals each node hosts a slice of the model and they exchange
+activations in a chain (pipeline) — the swarm's heterogeneity shows up as replicas in
+distinct precisions/nodes, exactly what the routing exploits.
+
 
 ---
 
@@ -133,6 +154,40 @@ inherited unchanged.
 | Docker variant | 12 virtual nodes across 3 hosts (`docker-swarm/`) |
 | Models | `bloom-560m` + `bloom-1b7`, 24 blocks each, fp32 and bf16 replicas |
 | Stack | Petals 2.3.0.dev2 · Hivemind 1.2.0.dev0 (pinned commit) · transformers 4.43.1 · torch (CPU/MPS) |
+
+
+**Containers per computer (12 virtual nodes).** Spec of each container
+(`docker-swarm/docker-compose.*.yml`). Linux containers inside Docker Desktop have no MPS —
+all virtual nodes run on CPU.
+
+| Container | Host | Model | Blocks | vCPU | RAM | Precision |
+|---|---|---|---|---|---|---|
+| mac-fast | Mac M4 Pro | bloom-560m | 9 | 4 | 4 GB | fp32 |
+| mac-medium | Mac M4 Pro | bloom-560m | 4 | 2 | 2 GB | fp32 |
+| mac-slow | Mac M4 Pro | bloom-560m | 1 | 1 | 1 GB | fp32 |
+| mac-fast-bf16 | Mac M4 Pro | bloom-560m | 9 | 4 | 3 GB | bf16 |
+| mac-1b7 | Mac M4 Pro | bloom-1b7 | 24 | 4 | 6 GB | bf16 |
+| t490-founder | T490 | bloom-560m | 4 | 2 | 2 GB | fp32 (DHT founder) |
+| t490-slow | T490 | bloom-560m | 1 | 1 | 1 GB | fp32 |
+| t490-bf16 | T490 | bloom-560m | 4 | 2 | 2 GB | bf16 |
+| t490-1b7 | T490 | bloom-1b7 | 24 | 4 | 6 GB | bf16 |
+| t14-medium | T14 | bloom-560m | 4 | 2 | 2 GB | fp32 (netem/fault target, NET_ADMIN) |
+| t14-slow | T14 | bloom-560m | 1 | 1 | 1 GB | fp32 (NET_ADMIN) |
+| t14-bf16 | T14 | bloom-560m | 2 | 2 | 2 GB | bf16 |
+
+All 5 measured experiments run on `bloom-560m` — the `bloom-1b7` tier exists in the swarm and in
+the router's model-selection level, but is not the exercised path in the experiments. The models
+are small enough to run CPU-only on the 3 hosts (no CUDA on this hardware), keeping the Petals
+pipeline (DHT, block splits, KV cache) faithful to upstream.
+
+**Test data.**
+
+| Data | What it is | Where it's used |
+|---|---|---|
+| 3 everyday prompts | "The capital of France is", "Water boils at a temperature of", "The largest planet in the solar system is" — 20 generated tokens, 5 repetitions per α level | Experiments 1 and 3 |
+| WikiText-2 | 100 validation documents, sliding window — offline perplexity per (model, precision) → lookup table consulted by the router | Quality score (proxy) |
+| LAMBADA | 50 passages, exact-match on the last word | Experiment 5 (150 requests, 0 errors) |
+| Local reference model | Pristine fp32 copy of `bloom-560m` kept on the client — the "answer key" | NLL/token and token agreement |
 
 ### 5.2 Metrics
 
@@ -199,6 +254,8 @@ node. Adaptive routing only provides resilience when the swarm exposes
 genuine alternatives — overlapping block replicas with sufficiently current
 telemetry — and the natural extension is per-request RTT probes.
 
+![Experiment 2 — TTFT and throughput before/after netem](docs/assets/exp2-netem.png)
+
 ### 6.3 Experiment 3 — Concurrent mixed load
 
 `mixed-20261108-021346.csv` — 8 simultaneous requests (4 α=0 + 4 α=1):
@@ -209,6 +266,8 @@ telemetry — and the natural extension is per-request RTT probes.
 - Per-request TTFT: 0.61–1.60 s; decision time: 0.2–1.5 ms; **0 errors**.
 - Per-request instrumentation (the `current_route` ContextVar) eliminates the
   race of reading the shared manager's state after generation.
+
+![Experiment 3 — per-request TTFT and tok/s under concurrency](docs/assets/exp3-mixed.png)
 
 ### 6.4 Experiment 4 — Mid-generation fault injection
 
@@ -230,6 +289,8 @@ telemetry — and the natural extension is per-request RTT probes.
 This points directly at the natural extension: re-sending the prefix to the
 new block holder on failover.
 
+![Experiment 4 — retry backoff and stale-DHT window](docs/assets/exp4-fault.png)
+
 ### 6.5 Experiment 5 — Real-task accuracy (LAMBADA)
 
 `lambada-20261108-023638.csv` — 50 passages × 3 scenarios, 150 requests,
@@ -247,6 +308,8 @@ but accuracy is identical — the same model (bloom-560m) with deterministic
 greedy decoding produces the same text on any route. The potential quality
 gain (full-precision blocks) shows up in route cost, not in exact-match.
 Decision overhead: 0.37–0.44 ms.
+
+![Experiment 5 — LAMBADA accuracy with binomial 95% CI](docs/assets/exp5-lambada.png)
 
 ---
 
@@ -273,7 +336,24 @@ observable quality differences. The measurements show:
 - the fault tolerance inherited from Petals works, but the in-flight session
   does not migrate (the KV cache is server-side).
 
-### 7.2 Future work
+### 7.2 Threats to validity
+
+- **Small samples**: 18 requests in the α sweep (3 prompts × 5 α + vanilla), 50 LAMBADA
+  passages, 3 requests per α under netem — no confidence intervals; the sweep is a sanity
+  check of the mechanism, not a fine characterization of the frontier.
+- **Single topology**: a 3-host swarm with single-holder blocks; the detour and telemetry
+  reactivity conclusions depend on the topology and should be re-evaluated on swarms with
+  overlapping replicas.
+- **Quality as a proxy**: the quality dimension is the routing score (offline perplexity);
+  no measurable output-quality difference was observed (same model, deterministic greedy
+  decoding).
+- **Stale telemetry**: the DHT's RTT table refreshes by ping with a long window — the
+  predicted latency did not capture the injected delay; the reactivity conclusions hold for
+  this update regime.
+- **Model scope**: BLOOM-560m/1b7 on CPU/MPS (no CUDA, no quantization); behavior with
+  larger models and dedicated accelerators was not measured.
+
+### 7.3 Future work
 
 1. **Per-request RTT probes** (or event-driven DHT updates) to react to
    network changes in seconds, not minutes.

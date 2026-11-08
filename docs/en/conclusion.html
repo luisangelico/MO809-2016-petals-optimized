@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Conclusion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../conclusao.html">PT</a><a class="on" href="conclusion.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a href="related.html">Related Work</a>
+  <a href="proposal.html">Proposal</a><a href="methodology.html">Methodology</a>
+  <a href="results.html">Results</a><a class="on" href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">7 · Conclusion</p>
+<h2>Summary and future work</h2>
+<p>The project demonstrates that Petals' routing can be extended to <strong>per-request
+decisions</strong> without touching upstream code: a declared objective (α, latency budget,
+quality floor) selects model and replica via a configurable latency–quality cost graph,
+without touching upstream code. In this testbed the policy changed routes and latency behavior,
+<strong>but did not yield measurable output-quality differences</strong> (every evaluated route
+served the same model and produced equivalent outputs under deterministic decoding); validating
+an end-to-end latency–quality Pareto frontier remains future work, requiring execution
+alternatives with observable quality differences. The measurements show:</p>
+<ul class="lista">
+  <li>decision overhead is negligible (0.2–1.5 ms per request);</li>
+  <li>differentiated routes coexist under concurrent load without mutual degradation;</li>
+  <li>differentiated routes absorb network damage where the degraded node isn't needed — and
+  cannot avoid it when it is the sole holder of the blocks;</li>
+  <li>the latency × quality trade-off with a fixed model shows up in latency and route cost,
+  not in task accuracy;</li>
+  <li>the fault tolerance inherited from Petals works, but the in-flight session does not
+  migrate (the KV cache is server-side).</li>
+</ul>
+<h3>Future work</h3>
+<ul class="lista">
+  <li><strong>Per-request RTT probes</strong> (or event-driven DHT updates) to react to network
+  changes in seconds, not minutes.</li>
+  <li><strong>Session failover</strong>: re-send the prefix to the new block holder, rebuilding
+  the KV cache — closes the gap found in experiment 4.</li>
+  <li><strong>Multiple-holder replicas</strong> to exercise route detours under degradation.</li>
+  <li><strong>Quantization</strong> (8-bit/NF4) as a third quality axis — requires a CUDA GPU.</li>
+  <li><strong>Validation of an end-to-end latency–quality frontier</strong>: requires execution
+  alternatives with observable quality differences (multiple-holder replicas, model variants of
+  distinct quality) selected per request — more samples per α and a formal comparison against the
+  always-fast and always-accurate baselines.</li>
+</ul>
+
+<nav class="pagination">
+  <a href="results.html"><span>← Previous</span><b>Results</b></a>
+  <a class="proxima" href="references.html"><span>Next →</span><b>References</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

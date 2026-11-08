@@ -45,9 +45,10 @@ to care a little more about quality: α = 0, 0.25, 0.5, 0.75, 1. For each level 
 record how long the first word took to appear, the words-per-second rate, and how
 good the answer was (perplexity + agreement with the reference model).
 
-**Result we expect:** a **Pareto frontier** — a curve showing the best possible
-trade-offs. Points on the curve are the smart choices ("this much speed for that
-much quality"); the router's curve is compared against four naive strategies:
+**What we measure:** the **route cost across α** — the weighted combination of
+measured latency and the quality *proxy* (predicted perplexity). Whether proxy
+differences yield observable output-quality differences is assessed separately
+(experiment 5); the router's curve is compared against four naive strategies:
 Petals' default routing, always the fastest option, always the most accurate one,
 and random picking. If our router's curve sits *above/left* of the naive ones,
 it wins.

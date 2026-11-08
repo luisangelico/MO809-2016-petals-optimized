@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Introduction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../introducao.html">PT</a><a class="on" href="introduction.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a class="on" href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a href="related.html">Related Work</a>
+  <a href="proposal.html">Proposal</a><a href="methodology.html">Methodology</a>
+  <a href="results.html">Results</a><a href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">1 · Introduction</p>
+<h2>The problem</h2>
+<p>Large language models do not fit on a single machine: Petals splits a transformer into
+blocks hosted on different computers, and a request traverses that node chain in sequence.
+The default router (<span class="mono">RemoteSequenceManager</span>) picks servers optimizing
+only <em>throughput and ping</em> — every request is routed identically.</p>
+<p>This ignores the fact that requests differ: interactive traffic (chat, autocomplete) needs
+<strong>low latency</strong>; summarization and reasoning <strong>tolerate more latency in
+exchange for higher quality</strong>. Between these extremes lies a whole spectrum of
+intermediate objectives.</p>
+<h3>Motivation</h3>
+<p>A home swarm is heterogeneous by nature: distinct hardware (Apple Silicon GPU vs. x86 CPUs),
+distinct precisions (fp32 vs. bf16), and links of very different quality (home LAN vs. corporate
+network). That heterogeneity — usually treated as a limitation — is exactly what makes
+per-request routing <em>useful</em>: there are real choices to make on every request, and
+choosing well changes both latency and quality.</p>
+<h3>Objectives</h3>
+<ul class="lista">
+  <li>Extend Petals' client-side routing to decide <em>per request</em> which nodes/replicas to
+  use, based on a declared objective (α ∈ [0, 1], latency budget, quality floor).</li>
+  <li>Keep the upstream Petals checkout untouched — the extension lives in a separate package
+  (<span class="mono">router/</span>) that subclasses
+  <span class="mono">RemoteSequenceManager</span>.</li>
+  <li>Evaluate per-request route selection across latency and a quality <em>proxy</em> (the routing score); assess whether proxy differences yield measurable output-quality differences.</li>
+  <li>Measure robustness: network degradation, concurrent mixed load, mid-generation node
+  failure, and accuracy on a real task (LAMBADA).</li>
+</ul>
+
+<nav class="pagination">
+  <a href="index.html"><span>← Previous</span><b>Home</b></a>
+  <a class="proxima" href="background.html"><span>Next →</span><b>Background</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

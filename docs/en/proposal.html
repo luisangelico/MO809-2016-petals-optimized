@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nectar — Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@500;600&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="bar-name" href="index.html">Nectar · <span>Petals</span> · MO809A</a>
+  <div class="langs"><a href="../proposta.html">PT</a><a class="on" href="proposal.html">EN</a></div>
+</div>
+<nav class="secoes">
+  <a href="index.html">Home</a><a href="introduction.html">Introduction</a>
+  <a href="background.html">Background</a><a href="related.html">Related Work</a>
+  <a class="on" href="proposal.html">Proposal</a><a href="methodology.html">Methodology</a>
+  <a href="results.html">Results</a><a href="conclusion.html">Conclusion</a>
+  <a href="references.html">References</a><a href="about.html">About</a>
+</nav>
+</header>
+<main>
+
+<p class="eyebrow">4 · Proposal</p>
+<h2>The objective-aware router</h2>
+<p>Each request declares an objective; the router converts that objective into weights on
+Petals' block graph and solves the shortest path — <strong>with zero server-side changes</strong>.
+The flow, step by step:</p>
+<figure>
+  <img src="../assets/architecture.png" alt="System architecture: 3 hosts with containers, Hivemind DHT, router/ package and the 5 per-request decisions">
+  <figcaption>System architecture: the 3 hosts (Mac M4 Pro, T490, T14) with their containers, the
+  Hivemind/libp2p DHT as the bulletin board, the router/ → Petals → Hivemind stack and, on the right,
+  the 5 per-request decisions (objective → model selection → candidate spans → Dijkstra → generation).</figcaption>
+</figure>
+<ol class="fases">
+  <li><b>Objective declared per request</b> — the caller sets α (0 = pure latency,
+  1 = pure quality), a latency budget, or a quality floor; the objective travels in a
+  <span class="mono">ContextVar</span> (<span class="mono">current_objective</span>), so concurrent
+  requests can carry different objectives at the same instant.</li>
+  <li><b>Model selection (level 1)</b> (<span class="mono">router/selector.py</span>) —
+  given the objective, pick the tier: <span class="mono">bloom-560m</span> (fast) vs
+  <span class="mono">bloom-1b7</span> (accurate), by predicted latency + quality score.</li>
+  <li><b>Block graph with dual weights (level 2)</b> (<span class="mono">router/policy.py</span>)
+  — <span class="mono">RequestAwareSequenceManager</span> subclasses Petals' manager and mirrors
+  its Dijkstra graph (client→server RTT, forced server-exit edges, per-block inference edges), but
+  keeps <em>latency</em> and <em>quality</em> as separate edge weights. A span's quality = mean
+  (model, precision) perplexity from the offline WikiText-2 table, converted to latency-equivalent
+  seconds (<span class="mono">quality_scale_s</span>) so both terms share units.</li>
+  <li><b>Combined shortest path</b> — Dijkstra solves
+  <span class="mono">cost = (1 − α)·latency + α·quality_cost</span> edge by edge; the resulting
+  path is decomposed into spans (consecutive blocks on the same peer).</li>
+  <li><b>Constrained objectives walk the dial</b> — latency budget: start at α=1 (best quality)
+  and halve α until the predicted latency fits (max 7 steps); quality floor: start at α=0 (best
+  latency) and walk α up until the predicted perplexity fits — a binary search on the
+  latency↔quality dial.</li>
+</ol>
+<div class="tabela"><table>
+  <tr><th>Objective</th><th>Router behavior</th></tr>
+  <tr><td>Pure α (0–1)</td><td>one Dijkstra with the fixed weight — the latency↔quality dial</td></tr>
+  <tr><td>Latency budget (SLA)</td><td>best quality that still meets the SLA — walks α downward</td></tr>
+  <tr><td>Quality floor</td><td>lowest latency that still meets the floor — walks α upward</td></tr>
+</table></div>
+<p>Level 1 of the router accepts three declared-objective forms: direct α,
+<span class="mono">latency_budget</span> (a TTFT SLA), or <span class="mono">quality_floor</span>.
+In practice, the request type defines it: chat/autocomplete → α≈0 or an SLA; summarization/reasoning
+→ high α. It is the same personalization logic as a re-routing system: <strong>the objective
+belongs to the client, not to the system</strong>.</p>
+<p>The <strong>quality table</strong> (<span class="mono">router/quality.py</span>) stores
+offline perplexity per (model, precision) on WikiText-2; each replica's dtype is already
+announced to the DHT, so fp32/bf16 replicas are client-visible <em>with zero server-side
+changes</em>. The objective travels per request in a <span class="mono">ContextVar</span>, and
+Petals' failure handling (banned peers, DHT rerouting) is inherited unchanged. Every request
+produces a CSV row: TTFT, tok/s, decision time, route, estimated activation bytes, NLL vs fp32
+reference, and task accuracy.</p>
+
+<nav class="pagination">
+  <a href="related.html"><span>← Previous</span><b>Related Work</b></a>
+  <a class="proxima" href="methodology.html"><span>Next →</span><b>Methodology</b></a>
+</nav>
+
+<footer>
+  <p>Code, raw CSVs and the full router in the
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized">project repository</a> ·
+  Full reports: <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/RELATORIO.md">RELATORIO.md (PT)</a> ·
+  <a href="https://github.com/luisangelico/MO809-2016-petals-optimized/blob/main/REPORT.md">REPORT.md (EN)</a></p>
+</footer>
+
+</main>
+</body>
+</html>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project (MO809A final project)
 
-**Optimized Petals: request-aware route optimization for distributed LLM inference.**
+**Nectar (formerly "Optimized Petals"): request-aware, objective-aware route optimization for distributed LLM inference.**
 Not just reproducing Petals — extending its client-side routing
 (`src/petals/client/routing/sequence_manager.py`, `RemoteSequenceManager`) to decide
 *per request* which nodes/replicas to use, based on a declared objective
