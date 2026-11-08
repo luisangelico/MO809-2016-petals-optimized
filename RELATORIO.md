@@ -1,4 +1,4 @@
-# Otimização de Rotas Sensível a Requisições para Inferência Distribuída de LLMs
+# Otimização de Rotas Sensível a Requisições para Inferência Distribuída de LLMs: Seleção Objetivo-Consciente de Réplicas no Lado do Cliente em Petals
 
 **Relatório final — MO809A (Unicamp — Tópicos em Computação Distribuída)**
 Projeto: *Optimized Petals* — roteamento consciente do objetivo em enxames Petals.
@@ -37,8 +37,9 @@ requisição, e escolher bem muda tanto a latência quanto a qualidade percebida
    orçamento de latência), ou qualquer ponderação intermediária α ∈ [0, 1].
 2. **Manter o checkout upstream do Petals intacto** — a extensão vive em um
    pacote separado (`router/`) que subclasseia `RemoteSequenceManager`.
-3. **Avaliar como fronteira de Pareto** (latência × qualidade) contra linhas
-   de base: roteamento padrão do Petals, sempre-rápido, sempre-preciso.
+3. **Avaliar a seleção de rota por requisição** sobre latência e um *proxy* de
+   qualidade (escore de roteamento); verificar se diferenças do proxy produzem
+   diferenças mensuráveis de qualidade de saída.
 4. **Medir robustez**: degradação de rede, carga mista concorrente, falha de
    nó em plena geração e acurácia em tarefa real (LAMBADA).
 
@@ -85,6 +86,8 @@ requisição, e escolher bem muda tanto a latência quanto a qualidade percebida
 | **FlexGen** (Sheng et al., ICML 2023) | Inferência de alto throughput em 1 GPU | Otimiza colocação de tensores em um nó; aqui a otimização é de *rota* entre nós |
 | **vLLM / PagedAttention** (Kwon et al., SOSP 2023) | Gerenciamento de memória KV no servidor | Atua no servidor; este projeto atua no cliente, na escolha da rota |
 | **Dijkstra / Kademlia** (Maymounkov & Mazières, IPTPS 2002) | Caminhos mínimos; DHT XOR | Base algorítmica do roteador e da descoberta de pares |
+
+**Posicionamento (lacuna de pesquisa).** Sistemas existentes estudam separadamente execução descentralizada de LLMs, roteamento de réplicas, agendamento em recursos heterogêneos, roteamento de modelos e precisão adaptativa — nenhum estabelece a política combinada proposta aqui: seleção por requisição da configuração de execução no Petals (variante de modelo, réplica de bloco, precisão e nó) sob um objetivo explícito de latência vs. qualidade, considerando comunicação, concorrência, falhas e overhead de roteamento. Nesta topologia avaliada, o escore de qualidade não produziu variação mensurável de qualidade de saída; a análise de Pareto reportada deve ser interpretada como trade-off de custo-de-rota/latência, não como uma fronteira de qualidade validada de ponta a ponta.
 
 ---
 
@@ -167,9 +170,11 @@ concordância de tokens · acurácia em tarefa (LAMBADA).
 **Leitura.** A rota muda de composição ao longo do α: com α=0 a rota usa 5
 spans em hosts locais rápidos; com α=1 o roteador inclui o span fp32 do T14 e
 a perplexidade prevista cai (22,075 → 22,025) ao custo de tokens/s menores.
-O NLL medido é plano porque todas as rotas servem o mesmo modelo — a dimensão
-qualidade aparece no **custo da rota**, não no texto gerado. O overhead de
-decisão fica entre 0,2 e 0,6 ms por requisição (desprezível).
+**Isso é uma diferença no escore de roteamento, não evidência observada de
+texto melhor**: como todas as rotas servem o mesmo modelo, o NLL medido e a
+concordância são planos ao longo de todo o α — a dimensão qualidade aparece no
+**custo da rota**, não no texto gerado. O overhead de decisão fica entre 0,2 e
+0,6 ms por requisição (desprezível).
 
 ### 6.2 Experimento 2 — Degradação de rede (netem)
 
@@ -243,10 +248,15 @@ rota, não no acerto. Overhead de decisão: 0.37–0.44 ms.
 
 ### 7.1 Síntese
 
-O projeto demonstra que o roteamento do Petals pode ser estendido para
-**decisões por requisição** sem tocar o código upstream: um objetivo declarado
-(α, orçamento de latência, piso de qualidade) seleciona modelo e réplica via
-um grafo de custo latência × qualidade. As medições mostram:
+O projeto demonstra **roteamento objetivo-consciente de réplicas por
+requisição**, no cliente, usando um grafo de custo latência–qualidade
+configurável — sem tocar o código upstream. Neste testbed, a política mudou
+rotas e comportamento de latência, **mas não produziu diferenças mensuráveis
+de qualidade de saída** (todas as rotas avaliadas serviram o mesmo modelo e
+geraram saídas equivalentes sob decodificação determinística); a validação de
+uma fronteira de Pareto latência–qualidade de ponta a ponta fica como trabalho
+futuro, exigindo alternativas de execução com diferenças observáveis de
+qualidade. As medições mostram:
 
 - o overhead da decisão é desprezível (0.2–1.5 ms por requisição);
 - rotas diferenciadas coexistem sob carga concorrente sem degradação mútua;
@@ -266,9 +276,11 @@ um grafo de custo latência × qualidade. As medições mostram:
 3. **Réplicas com donos múltiplos** na topologia para exercitar o desvio de
    rota sob degradação (o experimento 2 ficou limitado por donos únicos).
 4. **Quantização** (8-bit/NF4) como terceiro eixo de qualidade — exige GPU CUDA.
-5. **Fronteira de Pareto contínua**: mais amostras por α para barras de erro
-   mais estreitas e comparação formal contra as baselines sempre-rápido e
-   sempre-preciso.
+5. **Validação de uma fronteira latência–qualidade de ponta a ponta**: exige
+   alternativas de execução com diferenças observáveis de qualidade (réplicas
+   com donos múltiplos, variantes de modelo com qualidade distinta)
+   selecionadas por requisição — mais amostras por α e comparação formal
+   contra as baselines sempre-rápido e sempre-preciso.
 
 ---
 

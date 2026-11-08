@@ -1,4 +1,4 @@
-# Request-Aware Route Optimization for Distributed LLM Inference
+# Request-Aware Route Optimization for Distributed LLM Inference: Client-Side Objective-Aware Replica Selection in Petals
 
 **Final report — MO809A (Unicamp — Topics in Distributed Computing)**
 Project: *Optimized Petals* — objective-aware routing in Petals swarms.
@@ -38,8 +38,9 @@ changes both latency and perceived quality.
    or any intermediate weighting α ∈ [0, 1].
 2. **Keep the upstream Petals checkout untouched** — the extension lives in a
    separate package (`router/`) that subclasses `RemoteSequenceManager`.
-3. **Evaluate as a Pareto frontier** (latency × quality) against baselines:
-   Petals' default routing, always-fast, always-accurate.
+3. **Evaluate per-request route selection** across latency and a quality
+   *proxy* (the routing score); assess whether proxy differences yield
+   measurable output-quality differences.
 4. **Measure robustness**: network degradation, concurrent mixed load,
    mid-generation node failure, and accuracy on a real task (LAMBADA).
 
@@ -86,6 +87,8 @@ changes both latency and perceived quality.
 | **FlexGen** (Sheng et al., ICML 2023) | High-throughput inference on 1 GPU | Optimizes tensor placement on one node; here the optimization is the *route* across nodes |
 | **vLLM / PagedAttention** (Kwon et al., SOSP 2023) | Server-side KV memory management | Acts on the server; this project acts on the client, choosing the route |
 | **Dijkstra / Kademlia** (Maymounkov & Mazières, IPTPS 2002) | Shortest paths; XOR DHT | Algorithmic basis of the router and peer discovery |
+
+**Positioning (research gap).** Existing systems separately study decentralized LLM execution, replica routing, heterogeneous-resource scheduling, model routing, and adaptive precision; none establishes the combined policy proposed here: per-request selection of a Petals execution configuration (model variant, block replica, precision, and node) under an explicit latency-versus-quality objective, accounting for communication, concurrency, failures, and routing overhead. In the evaluated topology, quality-aware scoring did not produce measurable output-quality variation; the reported Pareto analysis should therefore be interpreted as a route-cost/latency trade-off rather than a validated end-to-end quality frontier.
 
 ---
 
@@ -168,8 +171,9 @@ route composition (span count, precision, nodes) · activation bytes per token
 **Reading.** The route changes composition across α: with α=0 the route uses
 5 spans on fast local hosts; with α=1 the router includes the T14's fp32 span
 and the predicted perplexity drops (22,075 → 22,025) at the cost of lower
-tok/s. Measured NLL is flat because every route serves the same model — the
-quality dimension shows up in the **route cost**, not in the generated text.
+tok/s. **This is a routing-score difference, not observed evidence of better
+text**: since every route serves the same model, the quality dimension shows
+up in the **route cost**, not in the generated text.
 Decision overhead stays between 0.2 and 0.6 ms per request (negligible).
 
 ### 6.2 Experiment 2 — Network degradation (netem)
@@ -188,9 +192,12 @@ Decision overhead stays between 0.2 and 0.6 ms per request (negligible).
 (α=0.5/1) go straight through it and **cannot detour** — the blocks it hosts
 have single holders in this topology. The predicted latency barely reacted
 (0.91 → 0.94 s) while actual TTFT tripled: the DHT's ping-based RTT table
-refreshes too slowly to capture a sudden injected delay. This is the cost
-model's honest limitation and points at the natural extension: per-request
-RTT probes.
+refreshes too slowly to capture a sudden injected delay. **The failure to
+detour is a topology constraint, not a router failure**: with a single holder
+for the required blocks, no client-side routing algorithm can bypass the
+node. Adaptive routing only provides resilience when the swarm exposes
+genuine alternatives — overlapping block replicas with sufficiently current
+telemetry — and the natural extension is per-request RTT probes.
 
 ### 6.3 Experiment 3 — Concurrent mixed load
 
@@ -247,10 +254,14 @@ Decision overhead: 0.37–0.44 ms.
 
 ### 7.1 Summary
 
-The project demonstrates that Petals' routing can be extended to **per-request
-decisions** without touching upstream code: a declared objective (α, latency
-budget, quality floor) selects model and replica via a latency × quality cost
-graph. The measurements show:
+The project demonstrates **objective-aware, client-side, per-request replica
+routing** using a configurable latency–quality cost graph, without touching
+upstream code. In this testbed the policy changed routes and latency
+behavior, **but did not yield measurable output-quality differences** (every
+evaluated route served the same model and produced equivalent outputs under
+deterministic decoding); validating an end-to-end latency–quality Pareto
+frontier remains future work, requiring execution alternatives with
+observable quality differences. The measurements show:
 
 - decision overhead is negligible (0.2–1.5 ms per request);
 - differentiated routes coexist under concurrent load without mutual
@@ -271,9 +282,11 @@ graph. The measurements show:
 3. **Multiple-holder replicas** in the topology to exercise route detours
    under degradation (experiment 2 was limited by single holders).
 4. **Quantization** (8-bit/NF4) as a third quality axis — requires a CUDA GPU.
-5. **Continuous Pareto frontier**: more samples per α for tighter error bars
-   and a formal comparison against the always-fast and always-accurate
-   baselines.
+5. **Validation of an end-to-end latency–quality frontier**: requires
+   execution alternatives with observable quality differences (multiple-
+   holder replicas, model variants of distinct quality) selected per
+   request — more samples per α and a formal comparison against the
+   always-fast and always-accurate baselines.
 
 ---
 

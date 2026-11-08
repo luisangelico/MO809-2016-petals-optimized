@@ -82,12 +82,34 @@ figcaption{font:500 .84rem/1.5 'Archivo Narrow',sans-serif;color:var(--muted);ma
   font:.85rem/1.6 var(--mono);}
 footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
   font-size:.88rem;color:var(--muted);}
+/* slideshow chrome */
+.dots{position:fixed;right:16px;top:50%;transform:translateY(-50%);display:flex;
+  flex-direction:column;gap:9px;z-index:6;}
+.dots button{width:9px;height:9px;border-radius:50%;background:var(--line);border:0;padding:0;cursor:pointer;}
+.dots button.on{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);}
+.deck{position:fixed;right:16px;bottom:16px;display:flex;align-items:center;gap:8px;z-index:6;}
+.deck .contador{font:500 .8rem/1 'Archivo Narrow',sans-serif;color:var(--muted);
+  font-variant-numeric:tabular-nums;}
+.deck button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);cursor:pointer;font-size:.95rem;line-height:1;}
+.deck button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.deck button:disabled{opacity:.35;cursor:default;}
+main.js .slide{opacity:.25;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;}
+main.js .slide.ativa{opacity:1;transform:none;}
+@media (prefers-reduced-motion:reduce){main.js .slide{transition:none;transform:none;opacity:1;}}
+@media (max-width:700px){.dots{display:none;}}
 </style>
 
 <header class="bar"><div class="bar-in">
   <div class="bar-name">Optimized <span>Petals</span> · MO809A</div>
   <div class="langs"><a class="on" href="index.html">PT</a><a href="en.html">EN</a></div>
 </div></header>
+<nav class="dots" id="dots" aria-label="Navegação de slides"></nav>
+<div class="deck">
+  <span class="contador" id="contador">1 / 9</span>
+  <button id="prev" aria-label="Slide anterior">←</button>
+  <button id="next" aria-label="Próximo slide">→</button>
+</div>
 <main>
 
 <div class="hero">
@@ -96,7 +118,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
   <p class="sub">Estendemos o roteamento do cliente do <a href="https://github.com/bigscience-workshop/petals">Petals</a>
   para decidir <em>por requisição</em> quais nós e réplicas usar — latência ou qualidade,
   conforme o objetivo declarado — mantendo o código upstream intacto, e avaliamos a
-  fronteira de Pareto (latência × qualidade) num enxame heterogêneo de 3 hosts.</p>
+  seleção de rota por requisição (latência e um <em>proxy</em> de qualidade) num enxame heterogêneo de 3 hosts.</p>
   <div class="numeros">
     <div class="num"><b>5</b><span>experimentos medidos</span></div>
     <div class="num"><b>0.2–1.5 ms</b><span>overhead de decisão</span></div>
@@ -136,7 +158,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
     piso de qualidade).</li>
     <li>Manter o checkout upstream do Petals intacto — a extensão vive num pacote separado
     (<span class="mono">router/</span>) que subclasseia <span class="mono">RemoteSequenceManager</span>.</li>
-    <li>Avaliar como fronteira de Pareto (latência × qualidade) contra o roteamento padrão do Petals.</li>
+    <li>Avaliar a seleção de rota por requisição sobre latência e um <em>proxy</em> de qualidade (o escore de roteamento); verificar se diferenças do proxy produzem diferenças mensuráveis de qualidade de saída.</li>
     <li>Medir robustez: degradação de rede, carga mista concorrente, falha de nó em plena geração
     e acurácia em tarefa real (LAMBADA).</li>
   </ul>
@@ -194,6 +216,15 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
         <td>Caminhos mínimos; DHT XOR</td>
         <td>Base algorítmica do roteador e da descoberta de pares</td></tr>
   </table></div>
+  <p><strong>Posicionamento (lacuna de pesquisa).</strong> Os sistemas existentes estudam
+  separadamente execução descentralizada de LLMs, roteamento de réplicas, escalonamento em
+  recursos heterogêneos, roteamento de modelos e precisão adaptativa; nenhum estabelece a política
+  combinada proposta aqui: seleção por requisição de uma configuração de execução no Petals
+  (variante do modelo, réplica de bloco, precisão e nó) sob um objetivo explícito latência–qualidade,
+  considerando comunicação, concorrência, falhas e overhead de roteamento. Na topologia avaliada, o
+  escore de qualidade não produziu variação mensurável de qualidade de saída; a análise de Pareto
+  reportada deve portanto ser interpretada como um trade-off custo de rota/latência, e não como uma
+  fronteira de qualidade de ponta a ponta validada.</p>
 </section>
 
 <section id="proposta">
@@ -263,8 +294,9 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
   </table></div>
   <p>A rota muda de composição ao longo do α: com α=0 a rota usa 5 spans em hosts locais rápidos;
   com α=1 o roteador inclui o span fp32 do T14 e a perplexidade prevista cai (22,075 → 22,025) ao
-  custo de tokens/s menores. O NLL medido é plano porque todas as rotas servem o mesmo modelo —
-  a dimensão qualidade aparece no <em>custo da rota</em>, não no texto gerado. Overhead de decisão:
+  custo de tokens/s menores. <strong>Isso é uma diferença no escore de roteamento, não evidência
+  observada de texto melhor</strong>: como todas as rotas servem o mesmo modelo, a dimensão
+  qualidade aparece no <em>custo da rota</em>, não no texto gerado. Overhead de decisão:
   0.2–0.6 ms por requisição (desprezível).</p>
   <figure>
     <img src="assets/pareto-sweep.png" alt="Throughput e qualidade medidos vs. α (fronteira de Pareto)">
@@ -282,7 +314,10 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
   </table></div>
   <p>O impacto se divide exatamente ao longo do objetivo: a rota de latência (α=0) não usa o nó
   degradado e não sofre nada; as rotas de qualidade (α=0.5/1) passam por ele e <strong>não podem
-  desviar</strong> — os blocos que ele hospeda têm dono único nesta topologia. A latência prevista
+  desviar</strong> — os blocos que ele hospeda têm dono único nesta topologia.
+  <strong>O não-desvio é uma restrição de topologia, não uma falha do roteador</strong>: roteamento
+  adaptativo só entrega resiliência quando o enxame expõe alternativas reais — réplicas sobrepostas
+  com telemetria suficientemente atual. A latência prevista
   quase não reagiu (0.91 → 0.94 s) enquanto o TTFT real triplicou: a tabela de RTTs do DHT atualiza
   lento demais para capturar um atraso súbito — a extensão natural são sondas de RTT por requisição.</p>
 
@@ -326,8 +361,13 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
   <h2>Síntese e trabalhos futuros</h2>
   <p>O projeto demonstra que o roteamento do Petals pode ser estendido para <strong>decisões por
   requisição</strong> sem tocar o código upstream: um objetivo declarado (α, orçamento de latência,
-  piso de qualidade) seleciona modelo e réplica via um grafo de custo latência × qualidade. As
-  medições mostram:</p>
+  piso de qualidade) seleciona modelo e réplica via um grafo de custo latência–qualidade
+  configurável, sem tocar o código upstream. Neste testbed, a política mudou rotas e comportamento
+  de latência, <strong>mas não produziu diferenças mensuráveis de qualidade de saída</strong>
+  (todas as rotas avaliadas serviram o mesmo modelo e produziram saídas equivalentes sob
+  decodificação determinística); a validação de uma fronteira latência–qualidade de ponta a ponta
+  fica como trabalho futuro, exigindo alternativas de execução com diferenças observáveis de
+  qualidade. As medições mostram:</p>
   <ul class="lista">
     <li>o overhead da decisão é desprezível (0.2–1.5 ms por requisição);</li>
     <li>rotas diferenciadas coexistem sob carga concorrente sem degradação mútua;</li>
@@ -346,8 +386,10 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
     o KV cache — fecha a lacuna do experimento 4.</li>
     <li><strong>Réplicas com donos múltiplos</strong> para exercitar o desvio de rota sob degradação.</li>
     <li><strong>Quantização</strong> (8-bit/NF4) como terceiro eixo de qualidade — exige GPU CUDA.</li>
-    <li><strong>Fronteira de Pareto contínua</strong>: mais amostras por α e comparação formal
-    contra as baselines sempre-rápido e sempre-preciso.</li>
+    <li><strong>Validação de uma fronteira latência–qualidade de ponta a ponta</strong>: exige
+    alternativas de execução com diferenças observáveis de qualidade (réplicas com donos múltiplos,
+    variantes de modelos de qualidade distinta) selecionadas por requisição — mais amostras por α e
+    comparação formal contra as baselines sempre-rápido e sempre-preciso.</li>
   </ul>
 </section>
 
@@ -376,3 +418,52 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:24px;
 
 </main>
 <style>.refs{padding-left:22px;max-width:70ch}.refs li{margin-bottom:10px;font-size:.92rem}</style>
+<script>
+(function(){
+  var main=document.querySelector('main');
+  main.classList.add('js');
+  var slides=Array.prototype.slice.call(main.querySelectorAll('.hero,section'));
+  slides.forEach(function(s){s.classList.add('slide');});
+  var dots=document.getElementById('dots'),
+      contador=document.getElementById('contador'),
+      prev=document.getElementById('prev'),
+      next=document.getElementById('next'),
+      atual=-1;
+  slides.forEach(function(s,i){
+    var b=document.createElement('button');
+    b.setAttribute('aria-label','Slide '+(i+1));
+    b.addEventListener('click',function(){go(i);});
+    dots.appendChild(b);
+  });
+  var btns=dots.children;
+  function go(i){
+    if(i<0||i>=slides.length)return;
+    slides[i].scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function sync(i){
+    if(i===atual)return;
+    atual=i;
+    for(var k=0;k<btns.length;k++)btns[k].classList.toggle('on',k===i);
+    contador.textContent=(i+1)+' / '+slides.length;
+    prev.disabled=(i===0);
+    next.disabled=(i===slides.length-1);
+    slides.forEach(function(s,k){s.classList.toggle('ativa',k===i);});
+  }
+  prev.addEventListener('click',function(){go(atual-1);});
+  next.addEventListener('click',function(){go(atual+1);});
+  document.addEventListener('keydown',function(e){
+    if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+    if(e.key==='ArrowRight'){e.preventDefault();go(atual+1);}
+    else if(e.key==='ArrowLeft'){e.preventDefault();go(atual-1);}
+  });
+  main.addEventListener('scroll',function(){
+    var mt=main.getBoundingClientRect().top,best=0,bd=Infinity;
+    slides.forEach(function(s,i){
+      var d=Math.abs(s.getBoundingClientRect().top-mt);
+      if(d<bd){bd=d;best=i;}
+    });
+    sync(best);
+  },{passive:true});
+  sync(0);
+})();
+</script>
