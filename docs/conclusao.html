@@ -28,7 +28,7 @@
 <p>O projeto demonstra que o roteamento do Petals pode ser estendido para <strong>decisões por
 requisição</strong> sem tocar o código upstream: um objetivo declarado (α, orçamento de latência,
 piso de qualidade) seleciona modelo e réplica via um grafo de custo latência–qualidade
-configurável, sem tocar o código upstream. Neste testbed, a política mudou rotas e comportamento
+configurável. Neste testbed, a política mudou rotas e comportamento
 de latência, <strong>mas não produziu diferenças mensuráveis de qualidade de saída</strong>
 (todas as rotas avaliadas serviram o mesmo modelo e produziram saídas equivalentes sob
 decodificação determinística); a validação de uma fronteira latência–qualidade de ponta a ponta
@@ -46,11 +46,6 @@ qualidade. As medições mostram:</p>
 </ul>
 <h3>Trabalhos futuros</h3>
 <ul class="lista">
-  <li><strong>Sondas de RTT por requisição</strong> (ou atualizações de DHT dirigidas a eventos)
-  para reagir a mudanças de rede em segundos, não minutos.</li>
-  <li><strong>Failover de sessão</strong>: reenviar o prefixo ao novo dono do bloco, reconstruindo
-  o KV cache — fecha a lacuna do experimento 4.</li>
-  <li><strong>Réplicas com donos múltiplos</strong> para exercitar o desvio de rota sob degradação.</li>
   <li><strong>Quantização</strong> (8-bit/NF4) como terceiro eixo de qualidade — exige GPU CUDA.</li>
   <li><strong>Validação de uma fronteira latência–qualidade de ponta a ponta</strong>: exige
   alternativas de execução com diferenças observáveis de qualidade (réplicas com donos múltiplos,

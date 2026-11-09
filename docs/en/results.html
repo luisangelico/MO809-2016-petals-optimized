@@ -41,10 +41,11 @@ with α=1 the router includes the T14's fp32 span and the predicted perplexity d
 (22,075 → 22,025) at the cost of lower tok/s. <strong>This is a routing-score difference, not
 observed evidence of better text</strong>: since every route serves the same model, the quality
 dimension shows up in the <em>route cost</em>, not in the generated text. Decision overhead: 0.2–0.6 ms per request (negligible).</p>
-<figure>
-  <img src="../assets/pareto-sweep.png" alt="Throughput and measured quality vs. α (Pareto frontier)">
-  <figcaption>Experiment 1: throughput declines at the quality extreme (4.2 → 3.9 tok/s) and
-  measured NLL stays flat — the same model on every route.</figcaption>
+<figure class="estreita">
+  <img src="../assets/pareto-sweep.png" alt="Throughput vs. α (Pareto frontier)">
+  <figcaption>Experiment 1: throughput declines at the quality extreme (4.2 → 3.9 tok/s). Measured
+  NLL vs the fp32 reference stays flat (~1.13 at every α — the same model on every route), so only
+  the throughput panel is plotted.</figcaption>
 </figure>
 
 <h3>6.2 Network degradation (netem)</h3>
@@ -107,8 +108,8 @@ re-sending the prefix to the new block holder on failover.</p>
 <h3>6.5 Real-task accuracy (LAMBADA)</h3>
 <div class="tabela"><table>
   <tr><th>Scenario</th><th>Route</th><th>TTFT</th><th>tok/s</th><th>Accuracy</th></tr>
-  <tr><td>Optimizer α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
-  <tr><td>Optimizer α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Nectar α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Nectar α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
   <tr><td>Vanilla</td><td>—</td><td>0.93 s</td><td>2.57</td><td class="destaque">38/50 = 76%</td></tr>
 </table></div>
 <p>Routing changes <strong>latency, not accuracy</strong>: the quality route (α=1) pays +40%

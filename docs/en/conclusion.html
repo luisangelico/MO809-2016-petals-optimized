@@ -27,8 +27,8 @@
 <h2>Summary and future work</h2>
 <p>The project demonstrates that Petals' routing can be extended to <strong>per-request
 decisions</strong> without touching upstream code: a declared objective (α, latency budget,
-quality floor) selects model and replica via a configurable latency–quality cost graph,
-without touching upstream code. In this testbed the policy changed routes and latency behavior,
+quality floor) selects model and replica via a configurable latency–quality cost graph.
+In this testbed the policy changed routes and latency behavior,
 <strong>but did not yield measurable output-quality differences</strong> (every evaluated route
 served the same model and produced equivalent outputs under deterministic decoding); validating
 an end-to-end latency–quality Pareto frontier remains future work, requiring execution
@@ -45,11 +45,6 @@ alternatives with observable quality differences. The measurements show:</p>
 </ul>
 <h3>Future work</h3>
 <ul class="lista">
-  <li><strong>Per-request RTT probes</strong> (or event-driven DHT updates) to react to network
-  changes in seconds, not minutes.</li>
-  <li><strong>Session failover</strong>: re-send the prefix to the new block holder, rebuilding
-  the KV cache — closes the gap found in experiment 4.</li>
-  <li><strong>Multiple-holder replicas</strong> to exercise route detours under degradation.</li>
   <li><strong>Quantization</strong> (8-bit/NF4) as a third quality axis — requires a CUDA GPU.</li>
   <li><strong>Validation of an end-to-end latency–quality frontier</strong>: requires execution
   alternatives with observable quality differences (multiple-holder replicas, model variants of

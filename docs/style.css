@@ -77,6 +77,7 @@ td.destaque{color:var(--accent);font-weight:500;}
 .fases b{display:block;font-family:'MuseoModerno','Archivo',sans-serif;font-size:1.02rem;}
 figure{margin:16px 0;}
 figure img{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;}
+figure.estreita img{width:auto;max-width:480px;display:block;margin-inline:auto;}
 figcaption{font:500 .84rem/1.5 'Archivo Narrow',sans-serif;color:var(--muted);margin-top:8px;}
 .mono{font-family:var(--mono);font-size:.92em;}
 /* prev/next pagination */

@@ -71,13 +71,62 @@ composição da rota (spans, precisão, nós) · bytes de ativação por token �
 referência fp32 · concordância de tokens · acurácia em tarefa (LAMBADA).</p>
 <h3>Experimentos</h3>
 <div class="tabela"><table>
-  <tr><th>#</th><th>Experimento</th><th>Protocolo</th></tr>
-  <tr><td>1</td><td>Varredura de α</td><td>α = 0 → 1 em 5 passos, mesmos prompts → fronteira de Pareto; vanilla como linha de base</td></tr>
-  <tr><td>2</td><td>Degradação de rede</td><td><span class="mono">tc netem delay 150ms 50ms loss 2%</span> no nó médio do T14; antes/depois com α ∈ {0, 0.5, 1}</td></tr>
-  <tr><td>3</td><td>Carga mista</td><td>8 requisições concorrentes: 4 com α=0 + 4 com α=1, simultâneas</td></tr>
-  <tr><td>4</td><td>Injeção de falha</td><td><span class="mono">docker stop</span> de um nó da rota em plena geração; linha do tempo da recuperação</td></tr>
-  <tr><td>5</td><td>Acurácia (LAMBADA)</td><td>50 passagens × {α=0, α=1, vanilla}; exatidão da última palavra</td></tr>
+  <tr><th>#</th><th>Experimento</th><th>O que testa</th><th>Protocolo</th></tr>
+  <tr><td>1</td><td>Varredura de α</td><td>o dial α realmente muda a rota — e qual o preço em velocidade</td><td>α ∈ {0, 0.25, 0.5, 0.75, 1.0} × 5 repetições × 3 prompts,
+      decodificação gulosa de 20 tokens; vanilla (roteador padrão do Petals) com os mesmos prompts
+      como linha de base; cada requisição registra TTFT, tokens/s, rota e NLL → fronteira de Pareto
+      custo-de-rota × latência</td></tr>
+  <tr><td>2</td><td>Degradação de rede</td><td>o dano cai só em quem usa o nó degradado</td><td><span class="mono">tc netem delay 150ms 50ms loss
+      2%</span> na <span class="mono">eth0</span> do t14-medium; execução antes e depois idêntica
+      com α ∈ {0, 0.5, 1}; compara-se TTFT/tokens/s antes→depois por nível e verifica-se se a rota
+      muda (a de α=0 nem toca o nó degradado)</td></tr>
+  <tr><td>3</td><td>Carga mista</td><td>cada requisição consegue a sua rota mesmo com todo mundo competindo</td><td>8 requisições partem juntas de uma barreira: 4 com α=0 +
+      4 com α=1, simultâneas no mesmo enxame; comparam-se as distribuições por requisição dos dois
+      grupos — isolamento de objetivo sob concorrência</td></tr>
+  <tr><td>4</td><td>Injeção de falha</td><td>o que o sistema faz quando um nó morre em plena geração — e o que se perde</td><td><span class="mono">docker stop</span> do t14-medium no
+      meio de uma geração; linha do tempo completa: detecção, recuo do retry
+      (1 → 2 → 4 → … → 60 s), janela do registro obsoleto do DHT (~5 min) e a requisição em
+      andamento morrendo com <span class="mono">AssertionError</span> (KV cache no servidor)</td></tr>
+  <tr><td>5</td><td>Acurácia (LAMBADA)</td><td>mudar a rota muda a resposta</td><td>50 passagens × 3 cenários (α=0, α=1, vanilla) =
+      150 requisições, decodificação gulosa; exatidão da última palavra por correspondência exata;
+      NLL vs. referência fp32 por requisição; IC 95% binomial em n=50</td></tr>
 </table></div>
+<h3>Protocolo de medição</h3>
+<p>Comum a todos os experimentos — cada requisição medida segue o mesmo fluxo:</p>
+<ol class="fases">
+  <li><b>Declaração do objetivo</b> — o cliente define α, orçamento de latência ou piso de
+  qualidade; o objetivo viaja num <span class="mono">ContextVar</span> por requisição, então
+  requisições concorrentes podem ter objetivos diferentes.</li>
+  <li><b>Descoberta de rota</b> — o roteador lê o DHT, escolhe spans e monta a cadeia; o tempo
+  dessa decisão é registrado em ms (overhead do roteador).</li>
+  <li><b>Geração</b> — 20 tokens com decodificação gulosa (determinística); o cliente marca o
+  tempo do primeiro token (TTFT) e mede tokens/s depois dele.</li>
+  <li><b>Avaliação</b> — o texto gerado é comparado com a referência fp32 local: NLL por token,
+  concordância de tokens; quando aplicável, exatidão da última palavra (LAMBADA).</li>
+  <li><b>Registro</b> — uma linha de CSV por requisição: TTFT, tokens/s, tempo de decisão, rota
+  (spans@pares), bytes de ativação, NLL, acurácia. Requisições com erro são filtradas das médias
+  e contabilizadas separadamente.</li>
+</ol>
+<h3>Setup de cada campanha de medição</h3>
+<ul class="lista">
+  <li><b>Bootstrap do DHT</b> — o t490-founder sobe o nó Kademlia (porta 31337); cada servidor
+  conecta nele e anuncia ao DHT os blocos que hospeda (modelo, precisão, throughput, estado) — o
+  <em>waggle</em> que o roteador lê.</li>
+  <li><b>Aquecimento</b> — requisições de aquecimento antes de medir: deixam os anúncios se
+  espalharem e os pares se conhecerem. Sem aquecimento, as primeiras rotas saem incompletas — foi
+  o que contaminou as execuções iniciais da campanha (α=1 apareceu <em>mais rápido</em> que α=0
+  antes de a topologia estabilizar).</li>
+  <li><b>Execução</b> — o cliente (no Mac) roda o roteador Nectar com um objetivo fixo por
+  execução (<span class="mono">router/run_client.py --objective …</span>); cada execução gera um
+  CSV completo, e o protocolo dos 5 passos acima vale para cada requisição dela.</li>
+  <li><b>Condições de rede</b> — Mac↔T490 no mesmo LAN; o T14 fica na rede corporativa, o enlace
+  mais lento da topologia — é essa assimetria entre réplicas que dá ao roteador algo a escolher.</li>
+</ul>
+<p>As médias vêm de <strong>5 repetições por nível de α com os mesmos prompts</strong>; a campanha
+final repetiu o protocolo completo 11 vezes (<span class="mono">sweep-*.csv</span>) para cobrir a
+variação natural do enlace. As barras de erro das figuras são o desvio-padrão por requisição
+entre prompts — variância dos prompts, não incerteza sobre a média. Requisições com erro nunca
+entram nas médias; o experimento 5 terminou com 0 erros nas 150 requisições.</p>
 
 <nav class="pagination">
   <a href="proposta.html"><span>← Anterior</span><b>Proposta</b></a>

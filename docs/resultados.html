@@ -42,10 +42,11 @@ custo de tokens/s menores. <strong>Isso é uma diferença no escore de roteament
 observada de texto melhor</strong>: como todas as rotas servem o mesmo modelo, a dimensão
 qualidade aparece no <em>custo da rota</em>, não no texto gerado. Overhead de decisão:
 0.2–0.6 ms por requisição (desprezível).</p>
-<figure>
-  <img src="assets/pareto-sweep.png" alt="Throughput e qualidade medidos vs. α (fronteira de Pareto)">
-  <figcaption>Experimento 1: throughput declina no extremo qualidade (4.2 → 3.9 tok/s) e o NLL medido
-  permanece plano — mesmo modelo em todas as rotas.</figcaption>
+<figure class="estreita">
+  <img src="assets/pareto-sweep.png" alt="Throughput vs. α (fronteira de Pareto)">
+  <figcaption>Experimento 1: throughput declina no extremo qualidade (4.2 → 3.9 tok/s). O NLL medido
+  vs. referência fp32 permanece plano (~1,13 em todo α — mesmo modelo em todas as rotas), por isso
+  só o painel de throughput é plotado.</figcaption>
 </figure>
 
 <h3>6.2 Degradação de rede (netem)</h3>
@@ -105,8 +106,8 @@ prefixo ao novo dono do bloco no failover.</p>
 <h3>6.5 Acurácia em tarefa real (LAMBADA)</h3>
 <div class="tabela"><table>
   <tr><th>Cenário</th><th>Rota</th><th>TTFT</th><th>tokens/s</th><th>Acurácia</th></tr>
-  <tr><td>Otimizador α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
-  <tr><td>Otimizador α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Nectar α=0</td><td>5 spans</td><td>0.96 s</td><td>2.65</td><td class="destaque">38/50 = 76%</td></tr>
+  <tr><td>Nectar α=1</td><td>7 spans, via T14 fp32</td><td>1.35 s</td><td>2.02</td><td class="destaque">38/50 = 76%</td></tr>
   <tr><td>Vanilla</td><td>—</td><td>0.93 s</td><td>2.57</td><td class="destaque">38/50 = 76%</td></tr>
 </table></div>
 <p>O roteamento muda a <strong>latência, não a acurácia</strong>: a rota de qualidade (α=1) paga

@@ -43,11 +43,12 @@ The flow, step by step:</p>
   given the objective, pick the tier: <span class="mono">bloom-560m</span> (fast) vs
   <span class="mono">bloom-1b7</span> (accurate), by predicted latency + quality score.</li>
   <li><b>Block graph with dual weights (level 2)</b> (<span class="mono">router/policy.py</span>)
-  — <span class="mono">RequestAwareSequenceManager</span> subclasses Petals' manager and mirrors
-  its Dijkstra graph (client→server RTT, forced server-exit edges, per-block inference edges), but
-  keeps <em>latency</em> and <em>quality</em> as separate edge weights. A span's quality = mean
-  (model, precision) perplexity from the offline WikiText-2 table, converted to latency-equivalent
-  seconds (<span class="mono">quality_scale_s</span>) so both terms share units.</li>
+  — Nectar repeats Petals' same search (finding a path of blocks from the first to the last), but
+  judges each piece of the path with <em>two criteria at once</em>: speed (latency) and richness
+  (quality). Quality comes from a table measured in advance: how "surprised" the model is when
+  reading validation text — the less surprise, the better the replica. To add the two criteria
+  into a single score, quality is converted into the same unit as latency (seconds), as if poor
+  quality cost extra time.</li>
   <li><b>Combined shortest path</b> — Dijkstra solves
   <span class="mono">cost = (1 − α)·latency + α·quality_cost</span> edge by edge; the resulting
   path is decomposed into spans (consecutive blocks on the same peer).</li>
@@ -62,6 +63,30 @@ The flow, step by step:</p>
   <tr><td>Latency budget (SLA)</td><td>best quality that still meets the SLA — walks α downward</td></tr>
   <tr><td>Quality floor</td><td>lowest latency that still meets the floor — walks α upward</td></tr>
 </table></div>
+<h3>Example: three requests at the same instant</h3>
+<p>The swarm announces the <span class="mono">bloom-560m</span> replicas to the DHT: on the Mac
+(fast, bf16) and on the T14 (slower, fp32). Three requests arrive together and take different
+paths:</p>
+<p><strong>1 · Chat — a 1.0 s latency budget.</strong> The router starts optimistic at α=1:
+Dijkstra picks the 7-span chain through the T14's fp32 replicas, the best predicted quality
+(perplexity 22.0) — but the predicted latency is 1.35 s, over the deadline. It halves α and
+repeats: α=0.5 still doesn't fit; α=0.25 finds the fast 5-span chain through the Mac's replicas,
+with 0.96 s predicted — inside the budget. Three steps later, the chat gets <strong>the best
+quality that fit in 1 s</strong>.</p>
+<p><strong>2 · Summarization — α=1.</strong> No deadline: the same Dijkstra with the fixed weight
+picks the 7-span chain through the T14 fp32 directly. The summarization pays 1.35 s of TTFT and
+gets the best predicted perplexity.</p>
+<p><strong>3 · Background batch — a quality floor.</strong> The client declares the floor as an
+objective string — <span class="mono">--objective quality_floor=22.2ppl</span>, parsed into
+<span class="mono">Objective(alpha=0.0, quality_floor_ppl=22.2)</span> that travels in the
+<span class="mono">ContextVar</span> — meaning: "the fastest route whose predicted perplexity
+stays under 22.2". The router starts at α=0: the 5-span chain through the Mac's bf16 replicas is
+the fastest, but predicts perplexity 22.3 — over the floor. It walks α up until a chain with the
+T14's fp32 spans predicts 22.1 — inside the floor. <strong>The fastest route that respects the
+quality</strong>, found with no trial and error on the client's side.</p>
+<div class="metafora">Three concurrent requests, three different routes at the same instant — each
+client takes its own — <em>(1 − α)·latency + α·quality</em> solved per request.
+<b>The objective belongs to the client, not to the system.</b></div>
 <p>Level 1 of the router accepts three declared-objective forms: direct α,
 <span class="mono">latency_budget</span> (a TTFT SLA), or <span class="mono">quality_floor</span>.
 In practice, the request type defines it: chat/autocomplete → α≈0 or an SLA; summarization/reasoning

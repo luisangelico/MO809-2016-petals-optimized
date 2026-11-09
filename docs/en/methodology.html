@@ -71,13 +71,67 @@ KV cache) faithful to upstream.</p>
 token agreement · task accuracy (LAMBADA).</p>
 <h3>Experiments</h3>
 <div class="tabela"><table>
-  <tr><th>#</th><th>Experiment</th><th>Protocol</th></tr>
-  <tr><td>1</td><td>α sweep</td><td>α = 0 → 1 in 5 steps, same prompts → Pareto frontier; vanilla baseline</td></tr>
-  <tr><td>2</td><td>Network degradation</td><td><span class="mono">tc netem delay 150ms 50ms loss 2%</span> on the T14's medium node; before/after with α ∈ {0, 0.5, 1}</td></tr>
-  <tr><td>3</td><td>Mixed load</td><td>8 concurrent requests: 4 with α=0 + 4 with α=1, simultaneous</td></tr>
-  <tr><td>4</td><td>Fault injection</td><td><span class="mono">docker stop</span> of a route node mid-generation; recovery timeline</td></tr>
-  <tr><td>5</td><td>Accuracy (LAMBADA)</td><td>50 passages × {α=0, α=1, vanilla}; exact-match on the last word</td></tr>
+  <tr><th>#</th><th>Experiment</th><th>What it tests</th><th>Protocol</th></tr>
+  <tr><td>1</td><td>α sweep</td><td>whether the α dial really changes the route — and what it costs
+      in speed</td><td>α ∈ {0, 0.25, 0.5, 0.75, 1.0} × 5 repetitions × 3 prompts, 20
+      tokens with greedy decoding; vanilla (Petals' default router) on the same prompts as
+      baseline; each request logs TTFT, tok/s, route and NLL → Pareto frontier as route-cost ×
+      latency</td></tr>
+  <tr><td>2</td><td>Network degradation</td><td>whether the damage lands only on whoever uses the
+      degraded node</td><td><span class="mono">tc netem delay 150ms 50ms loss
+      2%</span> on the t14-medium's <span class="mono">eth0</span>; identical before/after runs
+      with α ∈ {0, 0.5, 1}; TTFT/tok/s compared before→after per level and whether the route
+      changes (the α=0 route never touches the degraded node)</td></tr>
+  <tr><td>3</td><td>Mixed load</td><td>whether every request still gets its own route with everyone
+      competing</td><td>8 requests start together behind a barrier: 4 with α=0 +
+      4 with α=1, simultaneous on the same swarm; the two groups' per-request distributions are
+      compared — objective isolation under concurrency</td></tr>
+  <tr><td>4</td><td>Fault injection</td><td>what the system does when a node dies mid-generation —
+      and what is lost</td><td><span class="mono">docker stop</span> of t14-medium in
+      the middle of a generation; full timeline: detection, retry backoff
+      (1 → 2 → 4 → … → 60 s), the stale DHT record window (~5 min) and the in-flight request
+      dying with an <span class="mono">AssertionError</span> (KV cache on the server)</td></tr>
+  <tr><td>5</td><td>Accuracy (LAMBADA)</td><td>whether changing the route changes the answer</td><td>50 passages × 3 scenarios (α=0, α=1, vanilla) =
+      150 requests, greedy decoding; last-word accuracy by exact match; NLL vs the fp32 reference
+      per request; binomial 95% CI at n=50</td></tr>
 </table></div>
+<h3>Measurement protocol</h3>
+<p>Common to every experiment — each measured request follows the same flow:</p>
+<ol class="fases">
+  <li><b>Objective declaration</b> — the client sets α, a latency budget or a quality floor; the
+  objective travels per request in a <span class="mono">ContextVar</span>, so concurrent requests
+  can carry different objectives.</li>
+  <li><b>Route discovery</b> — the router reads the DHT, picks spans and builds the chain; that
+  decision's time is recorded in ms (the router's overhead).</li>
+  <li><b>Generation</b> — 20 tokens with greedy (deterministic) decoding; the client timestamps
+  the first token (TTFT) and measures tok/s after it.</li>
+  <li><b>Evaluation</b> — the generated text is compared against the local fp32 reference: NLL
+  per token, token agreement; where applicable, last-word exact match (LAMBADA).</li>
+  <li><b>Logging</b> — one CSV row per request: TTFT, tok/s, decision time, route (spans@peers),
+  activation bytes, NLL, accuracy. Failed requests are filtered out of the means and counted
+  separately.</li>
+</ol>
+<h3>Setup of each measurement campaign</h3>
+<ul class="lista">
+  <li><b>DHT bootstrap</b> — t490-founder brings up the Kademlia node (port 31337); each server
+  connects to it and announces to the DHT the blocks it hosts (model, precision, throughput,
+  state) — the <em>waggle</em> the router reads.</li>
+  <li><b>Warm-up</b> — warm-up requests before measuring: they let announcements spread and peers
+  get to know each other. Without warm-up, the first routes come out incomplete — that's what
+  contaminated the campaign's early runs (α=1 appeared <em>faster</em> than α=0 before the
+  topology stabilized).</li>
+  <li><b>Execution</b> — the client (on the Mac) runs the Nectar router with one objective per
+  run (<span class="mono">router/run_client.py --objective …</span>); each run produces one full
+  CSV, and the 5-step protocol above applies to every request in it.</li>
+  <li><b>Network conditions</b> — Mac↔T490 on the same LAN; the T14 sits on the corporate
+  network, the slowest link in the topology — that asymmetry between replicas is what gives the
+  router something to choose.</li>
+</ul>
+<p>The means come from <strong>5 repetitions per α level with the same prompts</strong>; the final
+campaign repeated the full protocol 11 times (<span class="mono">sweep-*.csv</span>) to cover the
+link's natural variation. The error bars in the figures are the per-request standard deviation
+across prompts — prompt variance, not uncertainty about the mean. Failed requests never enter the
+means; experiment 5 finished with 0 errors across its 150 requests.</p>
 
 <nav class="pagination">
   <a href="proposal.html"><span>← Previous</span><b>Proposal</b></a>

@@ -43,12 +43,12 @@ passo a passo:</p>
   dado o objetivo, escolher o tier: <span class="mono">bloom-560m</span> (rápido) vs
   <span class="mono">bloom-1b7</span> (preciso), pela latência prevista + pontuação de qualidade.</li>
   <li><b>Grafo de blocos com pesos duplos (nível 2)</b> (<span class="mono">router/policy.py</span>)
-  — <span class="mono">RequestAwareSequenceManager</span> subclasseia o gerenciador do Petals e
-  espelha seu grafo de Dijkstra (RTT cliente→servidor, arestas de saída forçadas, arestas por
-  bloco), mas guarda <em>latência</em> e <em>qualidade</em> como pesos separados. A qualidade de um
-  span = perplexidade média (modelo, precisão) da tabela offline WikiText-2, convertida para
-  segundos equivalentes (<span class="mono">quality_scale_s</span>) para compartilhar unidade com
-  a latência.</li>
+  — o Nectar repete a mesma busca do Petals (encontrar um caminho de blocos do primeiro ao
+  último), mas avalia cada pedaço do caminho com <em>dois critérios ao mesmo tempo</em>: a
+  rapidez (latência) e a riqueza (qualidade). A qualidade vem de uma tabela medida antes: quão
+  "surpreso" o modelo fica lendo textos de validação — quanto menor a surpresa, melhor a réplica.
+  Para somar os dois critérios numa conta só, a qualidade é convertida para a mesma unidade da
+  latência (segundos), como se qualidade ruim custasse tempo extra.</li>
   <li><b>Menor caminho combinado</b> — Dijkstra resolve
   <span class="mono">custo = (1 − α)·latência + α·custo_qualidade</span> aresta a aresta; o
   caminho resultante é decomposto em spans (blocos consecutivos no mesmo par).</li>
@@ -63,6 +63,29 @@ passo a passo:</p>
   <tr><td>Orçamento de latência (SLA)</td><td>melhor qualidade possível que ainda respeita o SLA — caminha α para baixo</td></tr>
   <tr><td>Piso de qualidade</td><td>latência mais baixa possível que ainda respeita o piso — caminha α para cima</td></tr>
 </table></div>
+<h3>Exemplo: três requisições no mesmo instante</h3>
+<p>O enxame anuncia no DHT as réplicas do <span class="mono">bloom-560m</span>: no Mac (rápidas,
+bf16) e no T14 (mais lentas, fp32). Três requisições chegam juntas e seguem caminhos diferentes:</p>
+<p><strong>1 · Chat — orçamento de latência de 1,0 s.</strong> O roteador começa otimista em α=1:
+o Dijkstra escolhe a cadeia de 7 spans pelas réplicas fp32 do T14, a melhor qualidade prevista
+(perplexidade 22,0) — mas a latência prevista é 1,35 s, acima do prazo. Divide α por 2 e repete:
+α=0,5 ainda não cabe; α=0,25 encontra a cadeia rápida de 5 spans pelas réplicas do Mac, com 0,96 s
+previstos — dentro do orçamento. Três passos depois, o chat recebe <strong>a melhor qualidade que
+coube em 1 s</strong>.</p>
+<p><strong>2 · Sumarização — α=1.</strong> Sem prazo: o mesmo Dijkstra com peso fixo escolhe
+direto a cadeia de 7 spans pelo T14 fp32. A sumarização paga 1,35 s de TTFT e recebe a melhor
+perplexidade prevista.</p>
+<p><strong>3 · Lote em segundo plano — piso de qualidade.</strong> O cliente declara o piso como
+uma string de objetivo — <span class="mono">--objective quality_floor=22.2ppl</span>, convertida em
+<span class="mono">Objective(alpha=0.0, quality_floor_ppl=22.2)</span> que viaja no
+<span class="mono">ContextVar</span> —, ou seja: "a rota mais rápida cuja perplexidade prevista não
+passe de 22,2". O roteador começa em α=0: a cadeia de 5 spans pelas réplicas bf16 do Mac é a mais
+rápida, mas prevê perplexidade 22,3 — acima do piso. Caminha α para cima até uma cadeia com os
+spans fp32 do T14 prever 22,1 — dentro do piso. <strong>A rota mais rápida que respeita a
+qualidade</strong>, achada sem tentativa e erro do cliente.</p>
+<div class="metafora">Três requisições concorrentes, três rotas diferentes no mesmo instante —
+cada cliente leva a sua — <em>(1 − α)·latência + α·qualidade</em> resolvida por requisição.
+<b>O objetivo pertence ao cliente, não ao sistema.</b></div>
 <p>O nível 1 do roteador aceita três formas de objetivo declarado: α direto,
 <span class="mono">latency_budget</span> (SLA de TTFT) ou <span class="mono">quality_floor</span>.
 Na prática, o tipo de requisição define: chat/autocomplete → α≈0 ou SLA; sumarização/raciocínio →
